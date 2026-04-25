@@ -9,7 +9,7 @@
 ;
 ; Pre-requisites before running ISCC.exe on this script:
 ;   1. Build the host:    apps/native/  → publishes to bin/Release/net8.0-windows10.0.19041.0/win-x64/publish/
-;   2. Build the HUD:     ../racecorio-prodrive/racecor-overlay/   →  electron-builder packs to dist/win-unpacked/
+;   2. Build the HUD:     ../prodrive-overlay/   →  electron-builder packs to dist/win-unpacked/
 ;   3. Set HOST_PUBLISH and HUD_UNPACKED defines below to those two paths.
 ;
 ; The build orchestration lives in `installer/build.ps1` (sibling to
@@ -29,7 +29,7 @@
   #define HOST_PUBLISH "..\apps\native\src\RaceCorProDrive\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish"
 #endif
 #ifndef HUD_UNPACKED
-  #define HUD_UNPACKED "..\..\racecorio-prodrive\racecor-overlay\dist\win-unpacked"
+  #define HUD_UNPACKED "..\..\prodrive-overlay\dist\win-unpacked"
 #endif
 
 [Setup]

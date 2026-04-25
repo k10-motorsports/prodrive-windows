@@ -12,15 +12,15 @@
 #   pwsh -File installer/build.ps1 -SkipHud   # host-only smoke test
 #
 # Assumes the two repos are siblings on disk:
-#   <root>/racecor-prodrive-windows/
-#   <root>/racecorio-prodrive/
+#   <root>/prodrive-windows/
+#   <root>/prodrive-overlay/
 # Override with -OverlayRepo if your layout differs.
 # ─────────────────────────────────────────────────────────────────
 
 [CmdletBinding()]
 param(
     [string] $Configuration = 'Release',
-    [string] $OverlayRepo   = (Resolve-Path (Join-Path $PSScriptRoot '..\..\racecorio-prodrive')),
+    [string] $OverlayRepo   = (Resolve-Path (Join-Path $PSScriptRoot '..\..\prodrive-overlay')),
     [switch] $SkipHud,
     [switch] $SkipHost
 )
@@ -28,7 +28,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $hostProj = Join-Path $repoRoot 'apps\native\src\RaceCorProDrive\RaceCorProDrive.csproj'
-$hudDir   = Join-Path $OverlayRepo 'racecor-overlay'
+$hudDir   = $OverlayRepo
 
 $publishDir = Join-Path $repoRoot "apps\native\src\RaceCorProDrive\bin\$Configuration\net8.0-windows10.0.19041.0\win-x64\publish"
 $hudUnpacked = Join-Path $hudDir 'dist\win-unpacked'
