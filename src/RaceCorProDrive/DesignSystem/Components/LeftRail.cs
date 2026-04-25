@@ -182,10 +182,10 @@ namespace RaceCorProDrive.DesignSystem.Components
                     ? new SolidColorBrush(Color.FromArgb(0x2E, 0xE5, 0x39, 0x35))
                     : (_isHovered
                         ? new SolidColorBrush(Color.FromArgb(0x80, 0x14, 0x14, 0x2A))
-                        : new SolidColorBrush(Colors.Transparent));
+                        : new SolidColorBrush(Microsoft.UI.Colors.Transparent));
                 _bg.BorderBrush = active
                     ? (Brush)Application.Current.Resources["BorderAccentBrush"]
-                    : new SolidColorBrush(Colors.Transparent);
+                    : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
                 _bg.BorderThickness = new Thickness(active ? 1 : 0);
                 _icon.Opacity = active || _isHovered ? 1.0 : 0.65;
             }

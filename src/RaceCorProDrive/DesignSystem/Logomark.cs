@@ -77,7 +77,7 @@ namespace RaceCorProDrive.DesignSystem
         private Color FillFor(string polygonHex) => IconTone switch
         {
             Tone.Color => ParseHex(polygonHex),
-            _ => Colors.White,
+            _ => Microsoft.UI.Colors.White,
         };
 
         private static PointCollection BuildPoints(IReadOnlyList<(double X, double Y)> pts)
@@ -100,7 +100,7 @@ namespace RaceCorProDrive.DesignSystem
                 byte b = System.Convert.ToByte(s.Substring(4, 2), 16);
                 return Color.FromArgb(0xFF, r, g, b);
             }
-            return Colors.White;
+            return Microsoft.UI.Colors.White;
         }
 
         /// Six filled polygons, same shapes the SwiftUI `RaceCorLogomarkShape`
