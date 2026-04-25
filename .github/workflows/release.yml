@@ -39,6 +39,9 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      - name: Set up MSBuild (.NET Framework)
+        uses: microsoft/setup-msbuild@v2
+
       - name: Show .NET SDK in use
         shell: pwsh
         run: |
@@ -116,21 +119,26 @@ jobs:
           Copy-Item -Force $sysPerms.FullName $toolsDir
 
       # ─── Publish WinUI host ────────────────────────────────────────
+      # Using .NET Framework msbuild.exe (from VS Build Tools) so the
+      # in-process CompileXaml task runs in its native .NET Framework
+      # environment instead of failing on .NET Core MSBuild.
       - name: Publish native host
         shell: pwsh
         run: |
           $publishDir = (Join-Path (Get-Location) "src/RaceCorProDrive/publish/win-x64")
           Write-Host "Requested publish dir: $publishDir"
-          dotnet publish src/RaceCorProDrive/RaceCorProDrive.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained true `
-            -p:PublishSingleFile=false `
-            -p:PublishReadyToRun=false `
-            -p:PublishDir=$publishDir `
-            -p:UseXamlCompilerExecutable=false `
-            -v:detailed `
-            -bl:publish.binlog
+          msbuild src/RaceCorProDrive/RaceCorProDrive.csproj `
+            /t:Restore`;Publish `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:RuntimeIdentifier=win-x64 `
+            /p:SelfContained=true `
+            /p:PublishSingleFile=false `
+            /p:PublishReadyToRun=false `
+            /p:PublishDir=$publishDir `
+            /p:UseXamlCompilerExecutable=false `
+            /v:detailed `
+            /bl:publish.binlog
           $publishExitCode = $LASTEXITCODE
           if ($publishExitCode -ne 0) {
             Write-Host "::group::XAML compiler input/output dump"
