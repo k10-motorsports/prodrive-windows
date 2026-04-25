@@ -6,7 +6,6 @@ Common entry points:
 - Repo overview: [`agents/prodrive-windows/CLAUDE.md`](agents/prodrive-windows/CLAUDE.md)
 - Cross-repo context: [`agents/prodrive-context/`](agents/prodrive-context/)
 - Native (WinUI 3) host: [`agents/prodrive-windows/apps/native/CLAUDE.md`](agents/prodrive-windows/apps/native/CLAUDE.md)
-- Shell: [`agents/prodrive-windows/apps/shell/CLAUDE.md`](agents/prodrive-windows/apps/shell/CLAUDE.md)
 
 To pull updates:
 ```bash
