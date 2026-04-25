@@ -81,6 +81,40 @@ jobs:
             -DestinationPath artifacts/overlay/unpacked -Force
           "HUD_UNPACKED=$((Resolve-Path artifacts/overlay/unpacked).Path)" >> $env:GITHUB_ENV
 
+      # ─── Workaround: drop System.Security.Permissions 6.0.0 next to
+      # the in-process XAML compiler task so .NET 8 MSBuild can load it.
+      - name: Restore + patch XAML compiler task deps
+        shell: pwsh
+        run: |
+          dotnet restore src/RaceCorProDrive/RaceCorProDrive.csproj -r win-x64
+          if ($LASTEXITCODE -ne 0) { throw "restore failed" }
+          $compilerDll = Get-ChildItem -Recurse -Filter "Microsoft.UI.Xaml.Markup.Compiler.dll" -Path "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "tools\\net6\.0" } |
+            Select-Object -First 1
+          if (-not $compilerDll) { throw "Compiler DLL not found in nuget cache" }
+          $toolsDir = $compilerDll.Directory.FullName
+          Write-Host "WindowsAppSDK tools dir: $toolsDir"
+          $sysPerms = Get-ChildItem -Recurse -Filter "System.Security.Permissions.dll" -Path "$env:USERPROFILE\.nuget\packages\system.security.permissions" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "6\.0\.0\\lib\\net6\.0" } |
+            Select-Object -First 1
+          if (-not $sysPerms) {
+            Write-Host "System.Security.Permissions 6.0.0 not in cache; fetching"
+            dotnet nuget push --help | Out-Null  # ensure dotnet is warm
+            $tmpProj = New-TemporaryFile
+            Remove-Item $tmpProj
+            New-Item -ItemType Directory -Path $tmpProj | Out-Null
+            Push-Location $tmpProj
+            "<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><TargetFramework>net6.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=""System.Security.Permissions"" Version=""6.0.0"" /></ItemGroup></Project>" | Set-Content "tmp.csproj"
+            dotnet restore tmp.csproj
+            Pop-Location
+            $sysPerms = Get-ChildItem -Recurse -Filter "System.Security.Permissions.dll" -Path "$env:USERPROFILE\.nuget\packages\system.security.permissions" |
+              Where-Object { $_.FullName -match "6\.0\.0\\lib\\net6\.0" } |
+              Select-Object -First 1
+          }
+          if (-not $sysPerms) { throw "Could not obtain System.Security.Permissions 6.0.0" }
+          Write-Host "Copying $($sysPerms.FullName) -> $toolsDir"
+          Copy-Item -Force $sysPerms.FullName $toolsDir
+
       # ─── Publish WinUI host ────────────────────────────────────────
       - name: Publish native host
         shell: pwsh
