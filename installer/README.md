@@ -22,7 +22,7 @@ pwsh -File installer/build.ps1
 ```
 
 What it does:
-1. `dotnet publish` the WinUI host (Release, win-x64, self-contained).
+1. `dotnet publish src/RaceCorProDrive/` — the WinUI host (Release, win-x64, self-contained).
 2. `npm install && npx electron-builder --win --x64 --dir` in the sibling `racecorio-prodrive/racecor-overlay/` repo to produce an unpacked tree.
 3. Runs `ISCC.exe` against `RaceCorProDrive.iss` with both output paths injected via `/D` defines.
 4. Writes `output/RaceCorProDrive-Setup-<version>.exe`.

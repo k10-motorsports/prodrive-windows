@@ -27,10 +27,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-$hostProj = Join-Path $repoRoot 'apps\native\src\RaceCorProDrive\RaceCorProDrive.csproj'
+$hostProj = Join-Path $repoRoot 'src\RaceCorProDrive\RaceCorProDrive.csproj'
 $hudDir   = $OverlayRepo
 
-$publishDir = Join-Path $repoRoot "apps\native\src\RaceCorProDrive\bin\$Configuration\net8.0-windows10.0.19041.0\win-x64\publish"
+$publishDir = Join-Path $repoRoot "src\RaceCorProDrive\bin\$Configuration\net8.0-windows10.0.19041.0\win-x64\publish"
 $hudUnpacked = Join-Path $hudDir 'dist\win-unpacked'
 
 # ── 1. Host (WinUI 3) ──

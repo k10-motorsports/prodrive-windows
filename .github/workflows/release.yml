@@ -75,13 +75,13 @@ jobs:
       - name: Publish native host
         shell: pwsh
         run: |
-          dotnet publish apps/native/src/RaceCorProDrive/RaceCorProDrive.csproj `
+          dotnet publish src/RaceCorProDrive/RaceCorProDrive.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=false
-          $publishDir = "apps/native/src/RaceCorProDrive/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish"
+          $publishDir = "src/RaceCorProDrive/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish"
           if (-not (Test-Path $publishDir)) { throw "Host publish dir not found: $publishDir" }
           "HOST_PUBLISH=$((Resolve-Path $publishDir).Path)" >> $env:GITHUB_ENV
 
