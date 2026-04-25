@@ -94,6 +94,7 @@ jobs:
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=false `
             -p:PublishDir=$publishDir `
+            -p:UseXamlCompilerExecutable=false `
             -v:detailed `
             -bl:publish.binlog
           $publishExitCode = $LASTEXITCODE
