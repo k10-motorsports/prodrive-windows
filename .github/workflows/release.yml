@@ -93,8 +93,24 @@ jobs:
             --self-contained true `
             -p:PublishSingleFile=false `
             -p:PublishReadyToRun=false `
-            -p:PublishDir=$publishDir
-          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
+            -p:PublishDir=$publishDir `
+            -v:detailed `
+            -bl:publish.binlog
+          $publishExitCode = $LASTEXITCODE
+          if ($publishExitCode -ne 0) {
+            Write-Host "::group::XAML compiler input/output (if present)"
+            $xamlObj = "src/RaceCorProDrive/obj/Release/win-x64"
+            if (Test-Path "$xamlObj/input.json") {
+              Write-Host "--- input.json ---"
+              Get-Content "$xamlObj/input.json"
+            }
+            if (Test-Path "$xamlObj/output.json") {
+              Write-Host "--- output.json ---"
+              Get-Content "$xamlObj/output.json"
+            }
+            Write-Host "::endgroup::"
+            throw "dotnet publish failed ($publishExitCode)"
+          }
           if (-not (Test-Path $publishDir)) {
             Write-Host "::group::Publish exited 0 but expected dir missing — searching workspace"
             Get-ChildItem -Recurse -Directory src/RaceCorProDrive |
@@ -106,6 +122,14 @@ jobs:
           Write-Host "Publish dir contents:"
           Get-ChildItem $publishDir | Select-Object -First 20 | Format-Table Name, Length
           "HOST_PUBLISH=$publishDir" >> $env:GITHUB_ENV
+
+      - name: Upload publish binlog on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-binlog
+          path: publish.binlog
+          if-no-files-found: ignore
 
       # ─── Inno Setup ────────────────────────────────────────────────
       - name: Install Inno Setup
