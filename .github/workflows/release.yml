@@ -86,7 +86,7 @@ jobs:
       - name: Restore + patch XAML compiler task deps
         shell: pwsh
         run: |
-          dotnet restore src/RaceCorProDrive/RaceCorProDrive.csproj -r win-x64
+          dotnet restore src/RaceCorProDrive/RaceCorProDrive.csproj -p:RuntimeIdentifier=win-x64 -p:Platform=x64
           if ($LASTEXITCODE -ne 0) { throw "restore failed" }
           $compilerDll = Get-ChildItem -Recurse -Filter "Microsoft.UI.Xaml.Markup.Compiler.dll" -Path "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk" -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match "tools\\net6\.0" } |
