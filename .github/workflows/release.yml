@@ -98,15 +98,17 @@ jobs:
             -bl:publish.binlog
           $publishExitCode = $LASTEXITCODE
           if ($publishExitCode -ne 0) {
-            Write-Host "::group::XAML compiler input/output (if present)"
-            $xamlObj = "src/RaceCorProDrive/obj/Release/win-x64"
-            if (Test-Path "$xamlObj/input.json") {
-              Write-Host "--- input.json ---"
-              Get-Content "$xamlObj/input.json"
-            }
-            if (Test-Path "$xamlObj/output.json") {
-              Write-Host "--- output.json ---"
-              Get-Content "$xamlObj/output.json"
+            Write-Host "::group::XAML compiler input/output dump"
+            foreach ($obj in @("src/RaceCorProDrive/obj/Release/win-x64", "obj/Release/win-x64")) {
+              foreach ($f in @("input.json","output.json")) {
+                $p = Join-Path $obj $f
+                if (Test-Path $p) {
+                  Write-Host "==== ${p} ===="
+                  Get-Content -Raw $p | Out-Host
+                } else {
+                  Write-Host "(not found: $p)"
+                }
+              }
             }
             Write-Host "::endgroup::"
             throw "dotnet publish failed ($publishExitCode)"
