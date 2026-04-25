@@ -37,7 +37,17 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.404"
+          dotnet-version: "9.0.x"
+
+      - name: Show .NET SDK in use
+        shell: pwsh
+        run: |
+          Write-Host "dotnet --version:"
+          dotnet --version
+          Write-Host "dotnet --list-sdks:"
+          dotnet --list-sdks
+          Write-Host "which dotnet:"
+          (Get-Command dotnet).Source
 
       # ─── Download latest plugin release ────────────────────────────
       - name: Download latest prodrive-plugin release
