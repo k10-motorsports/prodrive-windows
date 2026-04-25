@@ -18,13 +18,20 @@
 
 #define MyAppName        "RaceCor Pro Drive"
 #define MyAppShortName   "RaceCorProDrive"
-#define MyAppVersion     "0.1.0"
 #define MyAppPublisher   "K10 Motorsports"
 #define MyAppURL         "https://prodrive.racecor.io"
 #define MyAppExeName     "RaceCorProDrive.exe"
 #define HudExeName       "RaceCorOverlay.exe"
 
-; Paths — overridden on the command line via /D flags from build.ps1.
+; Version — driven by the git tag in CI, falls back for local builds.
+#ifndef AppVersion
+  #define AppVersion "0.1.0"
+#endif
+#define MyAppVersion AppVersion
+
+; Paths — overridden on the command line via /D flags from build.ps1
+; (local) or the CI release workflow (CI). PLUGIN_UNPACKED is optional;
+; if unset the [Files] section skips the Plugin\ payload.
 #ifndef HOST_PUBLISH
   #define HOST_PUBLISH "..\apps\native\src\RaceCorProDrive\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish"
 #endif
@@ -78,6 +85,14 @@ Source: "{#HOST_PUBLISH}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdi
 ; RaceCorOverlay.exe + Electron resources + native modules all
 ; ship together; the host doesn't peek inside.
 Source: "{#HUD_UNPACKED}\*"; DestDir: "{app}\Overlay"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; ── Plugin (SimHub + Homebridge) ──────────────────────────────
+; Optional; only included when PLUGIN_UNPACKED is defined (set by
+; the CI release workflow after downloading the latest plugin
+; release). Local build.ps1 runs leave it out.
+#ifdef PLUGIN_UNPACKED
+Source: "{#PLUGIN_UNPACKED}\*"; DestDir: "{app}\Plugin"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenu

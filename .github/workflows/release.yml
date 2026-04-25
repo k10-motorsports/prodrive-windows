@@ -1,0 +1,111 @@
+name: Build & Release
+
+# Combined Windows installer pipeline. Fires on a v* tag push to this
+# repo. Consumes the *latest* GitHub release of:
+#   - k10-motorsports/prodrive-plugin   (SimHub plugin assets)
+#   - k10-motorsports/prodrive-overlay  (Electron HUD, win-x64 unpacked tree)
+# Builds the WinUI 3 host from source, then runs Inno Setup to bundle
+# the three pieces into one .exe and attaches it to a release on this
+# repo.
+#
+# Required repository secrets:
+#   CROSS_REPO_PAT  — PAT (or GitHub App token) with `contents:read`
+#                     on prodrive-plugin and prodrive-overlay. The
+#                     default GITHUB_TOKEN cannot download release
+#                     assets from sibling private repos.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    name: Build Combined Installer
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # ─── Download latest plugin release ────────────────────────────
+      - name: Download latest prodrive-plugin release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/plugin | Out-Null
+          gh release download `
+            --repo k10-motorsports/prodrive-plugin `
+            --pattern "*.zip" `
+            --dir artifacts/plugin
+          # Unpack whatever zip the plugin release ships into a flat dir.
+          $zip = Get-ChildItem artifacts/plugin/*.zip | Select-Object -First 1
+          if (-not $zip) { throw "No plugin .zip found in latest release" }
+          Expand-Archive -Path $zip.FullName -DestinationPath artifacts/plugin/unpacked -Force
+          "PLUGIN_UNPACKED=$((Resolve-Path artifacts/plugin/unpacked).Path)" >> $env:GITHUB_ENV
+
+      # ─── Download latest overlay release ───────────────────────────
+      - name: Download latest prodrive-overlay release (win-x64)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/overlay | Out-Null
+          gh release download `
+            --repo k10-motorsports/prodrive-overlay `
+            --pattern "overlay-win-unpacked.zip" `
+            --dir artifacts/overlay
+          Expand-Archive -Path artifacts/overlay/overlay-win-unpacked.zip `
+            -DestinationPath artifacts/overlay/unpacked -Force
+          "HUD_UNPACKED=$((Resolve-Path artifacts/overlay/unpacked).Path)" >> $env:GITHUB_ENV
+
+      # ─── Publish WinUI host ────────────────────────────────────────
+      - name: Publish native host
+        shell: pwsh
+        run: |
+          dotnet publish apps/native/src/RaceCorProDrive/RaceCorProDrive.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:PublishReadyToRun=false
+          $publishDir = "apps/native/src/RaceCorProDrive/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish"
+          if (-not (Test-Path $publishDir)) { throw "Host publish dir not found: $publishDir" }
+          "HOST_PUBLISH=$((Resolve-Path $publishDir).Path)" >> $env:GITHUB_ENV
+
+      # ─── Inno Setup ────────────────────────────────────────────────
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iss = "installer/RaceCorProDrive.iss"
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" `
+            $iss `
+            "/DAppVersion=${{ steps.version.outputs.VERSION }}" `
+            "/DHOST_PUBLISH=$env:HOST_PUBLISH" `
+            "/DHUD_UNPACKED=$env:HUD_UNPACKED" `
+            "/DPLUGIN_UNPACKED=$env:PLUGIN_UNPACKED"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: installer/output/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
