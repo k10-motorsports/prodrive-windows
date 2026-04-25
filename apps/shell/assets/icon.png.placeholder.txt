@@ -1,0 +1,1 @@
+# SUPERSEDED — see icon.png / icon.ico / splash.png in this directory. This placeholder file couldn't be deleted from the sandbox but is no longer needed.

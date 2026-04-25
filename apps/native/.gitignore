@@ -1,0 +1,16 @@
+bin/
+obj/
+*.user
+.vs/
+AppPackages/
+BundleArtifacts/
+publish/
+*.pfx
+*.cer
+*.pvk
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

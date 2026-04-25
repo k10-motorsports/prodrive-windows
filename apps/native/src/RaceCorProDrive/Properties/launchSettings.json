@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "RaceCorProDrive (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

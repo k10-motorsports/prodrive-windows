@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:ext="http://schemas.microsoft.com/appx/manifest/uap/windows10/ext">
+  <Identity
+    Name="racing.k10motorsports.prodrive.racecor.win"
+    Publisher="CN=K10 Motorsports"
+    Version="0.1.0.0" />
+
+  <Properties>
+    <DisplayName>RaceCor Pro Drive</DisplayName>
+    <PublisherDisplayName>K10 Motorsports</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" StartPage="RaceCorProDrive.App">
+      <uap:VisualElements
+        DisplayName="RaceCor Pro Drive"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        Description="Broadcast-grade sim racing analytics platform"
+        BackgroundColor="transparent">
+        <uap:DefaultTile />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="racecor-prodrive" />
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

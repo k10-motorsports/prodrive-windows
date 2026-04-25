@@ -1,0 +1,24 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.PlaceholderPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationBackgroundThemeBrush}">
+
+    <Grid Padding="20" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <StackPanel Spacing="12" HorizontalAlignment="Center">
+            <TextBlock
+                x:Name="PageTitle"
+                Text="Page"
+                FontSize="24"
+                FontWeight="Bold"
+                Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
+                TextAlignment="Center" />
+
+            <TextBlock
+                Text="Coming soon"
+                FontSize="14"
+                Foreground="#A0A0A0"
+                TextAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</Page>

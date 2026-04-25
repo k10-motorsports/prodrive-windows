@@ -1,0 +1,65 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.SessionDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationBackgroundThemeBrush}"
+    Loaded="OnLoaded">
+
+    <Grid Padding="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,20">
+            <Button x:Name="BackButton" Content="← Back" Click="OnBack" />
+            <TextBlock
+                x:Name="SessionTitle"
+                Text="Session"
+                FontSize="24"
+                FontWeight="Bold"
+                Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
+                VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Session header info -->
+        <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,20">
+            <TextBlock x:Name="TrackInfo" Text="" Foreground="{ThemeResource ApplicationForegroundThemeBrush}" />
+            <TextBlock x:Name="CarInfo" Text="" Foreground="{ThemeResource ApplicationForegroundThemeBrush}" />
+            <TextBlock x:Name="DateInfo" Text="" Foreground="#A0A0A0" FontSize="12" />
+        </StackPanel>
+
+        <!-- Laps list -->
+        <TextBlock
+            Grid.Row="2"
+            Text="Laps"
+            FontSize="14"
+            FontWeight="SemiBold"
+            Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
+            Margin="0,0,0,12" />
+
+        <ListView
+            Grid.Row="2"
+            x:Name="LapsList">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{x:Bind}" Foreground="{ThemeResource ApplicationForegroundThemeBrush}" FontSize="12" />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <ProgressRing
+            x:Name="LoadingRing"
+            Grid.Row="2"
+            IsActive="True"
+            Foreground="#E53935" />
+
+        <TextBlock
+            x:Name="ErrorText"
+            Grid.Row="2"
+            Text=""
+            Foreground="#FF6B6B"
+            FontSize="12" />
+    </Grid>
+</Page>

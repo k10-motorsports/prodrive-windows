@@ -1,0 +1,80 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:design="using:RaceCorProDrive.DesignSystem"
+    xmlns:components="using:RaceCorProDrive.DesignSystem.Components"
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
+
+    <!--
+        Layout mirror of the SwiftUI DashboardView:
+            ┌── ThemedBackgroundControl ──────────────────────────────┐
+            │  ┌── LeftRail ──┐  ┌── Main column ──────────────────┐  ┌──── Sidebar ────┐
+            │  │ icons        │  │ tabs                            │  │ Tracks / Cars   │
+            │  │              │  │ Performance content (scroll)    │  │ glass panel     │
+            │  │              │  │ DataStrip (footer)              │  │                 │
+            │  └──────────────┘  └─────────────────────────────────┘  └─────────────────┘
+            └─────────────────────────────────────────────────────────┘
+        Background extends edge-to-edge so theme livery photos read across the rail
+        and sidebar — same composition as the macOS build.
+    -->
+
+    <Grid>
+        <design:ThemedBackgroundControl />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <components:LeftRail x:Name="LeftRail"
+                                 Grid.Column="0"
+                                 SelectedKey="dashboard" />
+
+            <!-- Main column -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Padding="20,0"
+                        VerticalAlignment="Center">
+                    <components:DashboardTabs x:Name="TabsBar"
+                                              SelectionChanged="OnTabChanged" />
+                </Border>
+
+                <!-- Hairline under the tabs -->
+                <Border Grid.Row="1"
+                        Height="1"
+                        Background="{StaticResource BorderSubtleBrush}" />
+
+                <ScrollViewer Grid.Row="2"
+                              Padding="20,14,20,30">
+                    <StackPanel x:Name="MainContent"
+                                Orientation="Vertical"
+                                Spacing="14" />
+                </ScrollViewer>
+
+                <components:DataStrip x:Name="StatStrip"
+                                      Grid.Row="3" />
+            </Grid>
+
+            <components:SidebarTabs x:Name="Sidebar"
+                                    Grid.Column="2" />
+        </Grid>
+
+        <ProgressRing x:Name="LoadingRing"
+                      IsActive="False"
+                      Width="48" Height="48"
+                      Foreground="{StaticResource BrandRedBrush}"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center" />
+    </Grid>
+</Page>

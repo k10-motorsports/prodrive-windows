@@ -1,0 +1,77 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.SessionsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationBackgroundThemeBrush}"
+    Loaded="OnLoaded">
+
+    <Grid Padding="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Text="Races"
+            FontSize="24"
+            FontWeight="Bold"
+            Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
+            Margin="0,0,0,16" />
+
+        <!-- Category filter -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,16">
+            <ComboBox
+                x:Name="CategoryCombo"
+                PlaceholderText="All Categories"
+                Width="200"
+                SelectionChanged="OnCategoryChanged">
+                <ComboBoxItem Content="All" IsSelected="True" />
+                <ComboBoxItem Content="Road" />
+                <ComboBoxItem Content="Oval" />
+                <ComboBoxItem Content="Dirt" />
+            </ComboBox>
+            <Button x:Name="LoadMoreButton" Content="Load More" Click="OnLoadMore" />
+        </StackPanel>
+
+        <!-- Sessions list -->
+        <ListView
+            Grid.Row="2"
+            x:Name="SessionsList"
+            ItemClick="OnSessionClick"
+            IsItemClickEnabled="True">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:SessionItemViewModel">
+                    <Border
+                        Background="#1A1A24"
+                        BorderBrush="#333333"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,0,0,8">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{x:Bind TrackName}" FontWeight="SemiBold" Foreground="{ThemeResource ApplicationForegroundThemeBrush}" />
+                            <TextBlock Text="{x:Bind CarName}" FontSize="12" Foreground="#A0A0A0" />
+                            <TextBlock Text="{x:Bind DateStr}" FontSize="11" Foreground="#707070" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Loading indicator -->
+        <ProgressRing
+            x:Name="LoadingRing"
+            Grid.Row="2"
+            IsActive="False"
+            Foreground="#E53935" />
+
+        <TextBlock
+            x:Name="ErrorText"
+            Grid.Row="3"
+            Text=""
+            Foreground="#FF6B6B"
+            FontSize="12" />
+    </Grid>
+</Page>
