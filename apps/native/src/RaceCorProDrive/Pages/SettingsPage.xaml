@@ -1,0 +1,54 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:design="using:RaceCorProDrive.DesignSystem"
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
+    <!--
+        Settings UI for the in-game HUD. Backed by
+        OverlaySettingsService — every control is two-way wired against
+        the JSON file the Electron HUD reads. Changes flow:
+            Toggle in this UI → Save() → file write → HUD's fs.watch →
+            HUD config.js applies live.
+        The HUD's in-game move/resize hotkey writes back to the same
+        file; this page's FileSystemWatcher reloads the form when that
+        happens so both directions stay in sync.
+
+        Layout: a NavigationView sidebar of categories on the left, the
+        currently-selected category's controls on the right. Categories
+        are populated programmatically in code-behind because most
+        rows are repeating (label + toggle + caption) and a XAML loop
+        for each would triple the file size for no readability win.
+    -->
+
+    <Grid>
+        <design:ThemedBackgroundControl />
+
+        <NavigationView
+            x:Name="CategoryNav"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            OpenPaneLength="200"
+            SelectionChanged="OnCategoryChanged">
+
+            <NavigationView.MenuItems>
+                <NavigationViewItem Tag="hud"        Content="HUD" />
+                <NavigationViewItem Tag="display"    Content="Display" />
+                <NavigationViewItem Tag="components" Content="Components" />
+                <NavigationViewItem Tag="commentary" Content="Commentary" />
+                <NavigationViewItem Tag="recording"  Content="Recording" />
+                <NavigationViewItem Tag="advanced"   Content="Advanced" />
+            </NavigationView.MenuItems>
+
+            <ScrollViewer Padding="32,24,32,32"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="FormHost"
+                            Orientation="Vertical"
+                            Spacing="14"
+                            MaxWidth="640" />
+            </ScrollViewer>
+        </NavigationView>
+    </Grid>
+</Page>
