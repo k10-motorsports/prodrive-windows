@@ -7,6 +7,7 @@ using RaceCorProDrive.Api;
 using RaceCorProDrive.DesignSystem;
 using RaceCorProDrive.DesignSystem.Components;
 using RaceCorProDrive.Support;
+using Panel = RaceCorProDrive.DesignSystem.Components.Panel;
 
 namespace RaceCorProDrive.Pages
 {
@@ -97,9 +98,9 @@ namespace RaceCorProDrive.Pages
                 var inWorst = IsInWindow(hour, when.WorstHourStart, when.WindowSize);
 
                 var verdict =
-                    inPeak ? ShouldYouRacePanel.Verdict.Good :
-                    inWorst ? ShouldYouRacePanel.Verdict.Bad :
-                    ShouldYouRacePanel.Verdict.Marginal;
+                    inPeak ? Verdict.Good :
+                    inWorst ? Verdict.Bad :
+                    Verdict.Marginal;
 
                 panel.Verdict = verdict;
                 panel.Title = inPeak ? "Go for it"
@@ -123,7 +124,7 @@ namespace RaceCorProDrive.Pages
             }
             else
             {
-                panel.Verdict = ShouldYouRacePanel.Verdict.Unknown;
+                panel.Verdict = Verdict.Unknown;
                 panel.Title = "Not enough data";
                 panel.Reason = "Add a few more races to get a race-now advisory.";
             }

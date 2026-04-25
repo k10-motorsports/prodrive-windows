@@ -2,9 +2,12 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.UI;
 
 namespace RaceCorProDrive.DesignSystem.Components
 {
+    public enum Verdict { Good, Marginal, Bad, Unknown }
+
     /// <summary>
     /// "Should you race right now?" advisory panel. Mirrors the Swift
     /// <c>ShouldYouRacePanel</c>: small caps header, big verdict,
@@ -14,8 +17,6 @@ namespace RaceCorProDrive.DesignSystem.Components
     /// </summary>
     public sealed class ShouldYouRacePanel : UserControl
     {
-        public enum Verdict { Good, Marginal, Bad, Unknown }
-
         public sealed class DetailModel
         {
             public string? PeakWindow { get; set; }

@@ -21,8 +21,10 @@ namespace RaceCorProDrive.DesignSystem
     /// currentColor-replacing pass at runtime; dim states are handled
     /// via <see cref="UIElement.Opacity"/> on the hosting control.
     /// </remarks>
-    public sealed class LucideIcon : Image
+    public sealed class LucideIcon : UserControl
     {
+        private readonly Image _image;
+
         public static readonly DependencyProperty KindProperty = DependencyProperty.Register(
             nameof(Kind),
             typeof(string),
@@ -41,7 +43,13 @@ namespace RaceCorProDrive.DesignSystem
             // callers override with Width/Height as needed.
             Width = 24;
             Height = 24;
-            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform;
+            _image = new Image
+            {
+                Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
+                HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
+                VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch,
+            };
+            Content = _image;
         }
 
         private static void OnKindChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -56,12 +64,12 @@ namespace RaceCorProDrive.DesignSystem
         {
             if (string.IsNullOrEmpty(Kind))
             {
-                Source = null;
+                _image.Source = null;
                 return;
             }
 
             var uri = new Uri($"ms-appx:///Assets/LucideIcons/{Kind}.svg");
-            Source = new SvgImageSource(uri);
+            _image.Source = new SvgImageSource(uri);
         }
     }
 

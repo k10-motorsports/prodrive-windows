@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.UI;
+using Rectangle = Microsoft.UI.Xaml.Shapes.Rectangle;
 
 namespace RaceCorProDrive.DesignSystem
 {
@@ -94,10 +95,4 @@ namespace RaceCorProDrive.DesignSystem
         }
     }
 
-    /// <summary>
-    /// Shape proxy used by <see cref="ThemedBackgroundControl"/>'s
-    /// gradient overlay so we don't pull in the full WinRT Shapes
-    /// namespace at every callsite.
-    /// </summary>
-    internal sealed class Rectangle : Microsoft.UI.Xaml.Shapes.Rectangle { }
 }

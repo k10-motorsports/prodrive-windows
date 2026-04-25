@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
+using Windows.UI;
 
 namespace RaceCorProDrive.DesignSystem.Components
 {
@@ -134,7 +135,7 @@ namespace RaceCorProDrive.DesignSystem.Components
         /// 36×36 cell that mirrors the SwiftUI <c>RailIconLabel</c> —
         /// rounded square, brand-tinted fill when active, soft hover.
         /// </summary>
-        private sealed class RailButton : Border
+        private sealed class RailButton : UserControl
         {
             public bool IsAlwaysInactive { get; init; }
 
@@ -165,7 +166,7 @@ namespace RaceCorProDrive.DesignSystem.Components
 
                 Width = 44;
                 Height = 36;
-                Child = _bg;
+                Content = _bg;
                 ToolTipService.SetToolTip(this, tooltip);
 
                 PointerEntered += (_, __) => { _isHovered = true; UpdateState(); };

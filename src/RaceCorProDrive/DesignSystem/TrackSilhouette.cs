@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
+using Path = Microsoft.UI.Xaml.Shapes.Path;
 
 namespace RaceCorProDrive.DesignSystem
 {

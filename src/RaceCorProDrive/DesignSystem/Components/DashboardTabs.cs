@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
+using Windows.UI;
 
 namespace RaceCorProDrive.DesignSystem.Components
 {
@@ -72,7 +73,7 @@ namespace RaceCorProDrive.DesignSystem.Components
             _prev.IsActive = Selected == Tab.Previous;
         }
 
-        private sealed class TabButton : Border
+        private sealed class TabButton : UserControl
         {
             private readonly TextBlock _label;
             private readonly Microsoft.UI.Xaml.Shapes.Rectangle _underline;
@@ -106,8 +107,11 @@ namespace RaceCorProDrive.DesignSystem.Components
                 _label.HorizontalAlignment = HorizontalAlignment.Center;
                 _label.VerticalAlignment = VerticalAlignment.Center;
 
-                Padding = new Thickness(12, 8, 12, 8);
-                Child = grid;
+                Content = new Border
+                {
+                    Padding = new Thickness(12, 8, 12, 8),
+                    Child = grid,
+                };
                 UpdateState();
             }
 
