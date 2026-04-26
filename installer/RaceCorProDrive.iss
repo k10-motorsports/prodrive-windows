@@ -71,6 +71,10 @@ CloseApplications=force
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
+; SimHub plugin install — visible on the Tasks page so the user knows
+; the installer will touch the SimHub install dir (or where it would,
+; if SimHub isn't installed yet). Default-on; uncheck to skip entirely.
+Name: "simhubplugin"; Description: "Install the RaceCor SimHub plugin (copies DLLs into the SimHub install folder)"; GroupDescription: "SimHub integration:"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
@@ -110,6 +114,42 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+// ─── Previous-version auto-uninstall ──────────────────────────────────
+// Inno Setup writes uninstall info under the AppId + "_is1" registry key.
+// For per-user installs (PrivilegesRequired=lowest) it's HKCU; legacy
+// installs may have landed in HKLM, so check both.
+function GetUninstallString(): String;
+var
+  uninstKey: String;
+  s: String;
+begin
+  // Must match the AppId GUID in [Setup] above. Inno Setup writes
+  // uninstall info under "<AppId>_is1". (We don't use SetupSetting()
+  // here because the {{ escaping interacts badly with Pascal comment
+  // syntax in [Code] blocks.)
+  uninstKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{D6F2E0F3-7B6E-4C42-9FE6-3F4E4E5C0DBB}_is1';
+  s := '';
+  if not RegQueryStringValue(HKCU, uninstKey, 'UninstallString', s) then
+    RegQueryStringValue(HKLM, uninstKey, 'UninstallString', s);
+  Result := s;
+end;
+
+procedure UninstallPreviousVersion();
+var
+  uninstStr: String;
+  resultCode: Integer;
+begin
+  uninstStr := GetUninstallString();
+  if uninstStr = '' then Exit;
+  uninstStr := RemoveQuotes(uninstStr);
+  // /VERYSILENT suppresses all UI, /SUPPRESSMSGBOXES kills any leftover
+  // confirmations, /NORESTART prevents reboot prompts. We don't care
+  // about the exit code — even a partial uninstall makes room for a
+  // clean install over the top.
+  Exec(uninstStr, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '',
+       SW_HIDE, ewWaitUntilTerminated, resultCode);
+end;
+
 // Find SimHub install dir by checking common locations. SimHub doesn't
 // register a single canonical path so we probe.
 function FindSimHubDir(): String;
@@ -191,5 +231,11 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if CurStep = ssPostInstall then InstallSimHubPlugin();
+  // Run the previous-version uninstaller right before our files land,
+  // so the user doesn't have to manually uninstall between iterations.
+  if CurStep = ssInstall then UninstallPreviousVersion();
+
+  // SimHub plugin install only fires if the user kept the task ticked.
+  if (CurStep = ssPostInstall) and IsTaskSelected('simhubplugin') then
+    InstallSimHubPlugin();
 end;
