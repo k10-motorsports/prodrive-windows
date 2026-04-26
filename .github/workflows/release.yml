@@ -24,8 +24,21 @@ permissions:
 
 jobs:
   build-installer:
-    name: Build Combined Installer
+    name: Build ${{ matrix.arch }} Installer
     runs-on: windows-latest
+
+    strategy:
+      # Don't abort the other arch if one fails — gives us partial release
+      # output we can ship while we fix the failed one.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            msbuild_platform: x64
+            rid: win-x64
+          - arch: arm64
+            msbuild_platform: ARM64
+            rid: win-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +102,7 @@ jobs:
       - name: Restore + patch XAML compiler task deps
         shell: pwsh
         run: |
-          dotnet restore src/RaceCorProDrive/RaceCorProDrive.csproj -p:RuntimeIdentifier=win-x64 -p:Platform=x64
+          dotnet restore src/RaceCorProDrive/RaceCorProDrive.csproj -p:RuntimeIdentifier=${{ matrix.rid }} -p:Platform=${{ matrix.msbuild_platform }}
           if ($LASTEXITCODE -ne 0) { throw "restore failed" }
           $compilerDll = Get-ChildItem -Recurse -Filter "Microsoft.UI.Xaml.Markup.Compiler.dll" -Path "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk" -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match "tools\\net6\.0" } |
@@ -125,13 +138,13 @@ jobs:
       - name: Publish native host
         shell: pwsh
         run: |
-          $publishDir = (Join-Path (Get-Location) "src/RaceCorProDrive/publish/win-arm64")
+          $publishDir = (Join-Path (Get-Location) "src/RaceCorProDrive/publish/${{ matrix.rid }}")
           Write-Host "Requested publish dir: $publishDir"
           msbuild src/RaceCorProDrive/RaceCorProDrive.csproj `
             /t:Restore`;Publish `
             /p:Configuration=Release `
-            /p:Platform=ARM64 `
-            /p:RuntimeIdentifier=win-arm64 `
+            /p:Platform=${{ matrix.msbuild_platform }} `
+            /p:RuntimeIdentifier=${{ matrix.rid }} `
             /p:SelfContained=true `
             /p:PublishSingleFile=false `
             /p:PublishReadyToRun=false `
@@ -172,7 +185,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: publish-binlog
+          name: publish-binlog-${{ matrix.arch }}
           path: publish.binlog
           if-no-files-found: ignore
 
@@ -188,6 +201,7 @@ jobs:
           & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" `
             $iss `
             "/DAppVersion=${{ steps.version.outputs.VERSION }}" `
+            "/DAppArch=${{ matrix.arch }}" `
             "/DHOST_PUBLISH=$env:HOST_PUBLISH" `
             "/DHUD_UNPACKED=$env:HUD_UNPACKED" `
             "/DPLUGIN_UNPACKED=$env:PLUGIN_UNPACKED"

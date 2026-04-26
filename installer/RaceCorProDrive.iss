@@ -29,6 +29,13 @@
 #endif
 #define MyAppVersion AppVersion
 
+; Architecture — set by CI to "x64" or "arm64" so we ship matching
+; installer per arch and Inno Setup correctly rejects mismatched
+; targets at install time. Defaults to x64 for local builds.
+#ifndef AppArch
+  #define AppArch "x64"
+#endif
+
 ; Paths — overridden on the command line via /D flags from build.ps1
 ; (local) or the CI release workflow (CI). PLUGIN_UNPACKED is optional;
 ; if unset the [Files] section skips the Plugin\ payload.
@@ -56,13 +63,18 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=output
-OutputBaseFilename=RaceCorProDrive-Setup-{#MyAppVersion}
+OutputBaseFilename=RaceCorProDrive-Setup-{#MyAppVersion}-{#AppArch}
 Compression=lzma2/ultra
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=..\src\RaceCorProDrive\Assets\icon.ico
-ArchitecturesAllowed=arm64
-ArchitecturesInstallIn64BitMode=arm64
+#if AppArch == "arm64"
+  #define IscArchKeyword "arm64"
+#else
+  #define IscArchKeyword "x64compatible"
+#endif
+ArchitecturesAllowed={#IscArchKeyword}
+ArchitecturesInstallIn64BitMode={#IscArchKeyword}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 CloseApplications=force
