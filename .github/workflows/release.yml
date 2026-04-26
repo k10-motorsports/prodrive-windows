@@ -125,13 +125,13 @@ jobs:
       - name: Publish native host
         shell: pwsh
         run: |
-          $publishDir = (Join-Path (Get-Location) "src/RaceCorProDrive/publish/win-x64")
+          $publishDir = (Join-Path (Get-Location) "src/RaceCorProDrive/publish/win-arm64")
           Write-Host "Requested publish dir: $publishDir"
           msbuild src/RaceCorProDrive/RaceCorProDrive.csproj `
             /t:Restore`;Publish `
             /p:Configuration=Release `
-            /p:Platform=x64 `
-            /p:RuntimeIdentifier=win-x64 `
+            /p:Platform=ARM64 `
+            /p:RuntimeIdentifier=win-arm64 `
             /p:SelfContained=true `
             /p:PublishSingleFile=false `
             /p:PublishReadyToRun=false `
