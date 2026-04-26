@@ -11,25 +11,15 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Title bar -->
-        <Grid x:Name="AppTitleBar" Height="40" Background="Transparent" VerticalAlignment="Top" Margin="0,0,0,0">
-            <TextBlock
-                x:Name="AppTitle"
-                Text="RaceCor Pro Drive"
-                Margin="12,8,0,0"
-                VerticalAlignment="Top"
-                Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
-                FontSize="14"
-                FontWeight="SemiBold" />
-
-            <!-- Sign out button in top right -->
+        <Grid x:Name="AppTitleBar" Height="40" Background="Transparent" VerticalAlignment="Top">
+            <TextBlock x:Name="AppTitle" Text="RaceCor Pro Drive" Margin="12,8,0,0" VerticalAlignment="Top"
+                       Foreground="{ThemeResource ApplicationForegroundThemeBrush}" FontSize="14" FontWeight="SemiBold" />
             <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" Orientation="Horizontal" Spacing="8">
                 <TextBlock x:Name="UserDisplay" Text="User" Foreground="{ThemeResource ApplicationForegroundThemeBrush}" VerticalAlignment="Center" FontSize="12" />
                 <Button x:Name="SignOutButton" Content="Sign Out" Click="OnSignOut" />
             </StackPanel>
         </Grid>
 
-        <!-- Main content with NavigationView -->
         <NavigationView
             x:Name="NavView"
             Grid.Row="1"
@@ -38,22 +28,8 @@
             IsPaneOpen="True"
             Loaded="OnNavViewLoaded">
             <NavigationView.MenuItems>
-                <NavigationViewItem Icon="Home" Content="Dashboard" x:Name="NavDashboard" Tag="dashboard" />
-                <NavigationViewItem Icon="List" Content="Races" x:Name="NavRaces" Tag="races" />
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Icon="ShowResults" Content="Moments" x:Name="NavMoments" Tag="moments" />
-                <NavigationViewItem Icon="MapPin" Content="Tracks" x:Name="NavTracks" Tag="tracks" />
-                <NavigationViewItem Icon="Bookmarks" Content="Cars" x:Name="NavCars" Tag="cars" />
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Icon="World" Content="DNA" x:Name="NavDNA" Tag="dna" />
-                <NavigationViewItem Icon="Clock" Content="When" x:Name="NavWhen" Tag="when" />
-                <NavigationViewItem Icon="ProtectedDocument" Content="Safety" x:Name="NavSafety" Tag="safety" />
-                <NavigationViewItem Icon="Favorite" Content="Composure" x:Name="NavComposure" Tag="composure" />
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Icon="Document" Content="Debrief" x:Name="NavDebrief" Tag="debrief" />
-                <NavigationViewItem Icon="Setting" Content="Settings" x:Name="NavSettings" Tag="settings" />
+                <NavigationViewItem Content="Dashboard" x:Name="NavDashboard" Tag="dashboard" />
             </NavigationView.MenuItems>
-
             <Frame x:Name="ContentFrame" />
         </NavigationView>
     </Grid>
