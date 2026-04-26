@@ -23,22 +23,40 @@ namespace RaceCorProDrive
             };
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => LogCrash("UnobservedTask", e.Exception);
 
+            BootTrace("App.InitializeComponent enter");
             this.InitializeComponent();
+            BootTrace("App.InitializeComponent done");
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
+            BootTrace("OnLaunched enter");
             try
             {
+                BootTrace("new MainWindow()");
                 var window = new MainWindow();
+                BootTrace("MainWindow created, calling Activate");
                 window.Activate();
+                BootTrace("Activate returned");
                 _ = TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
+                BootTrace("TokenStore fetch kicked off");
             }
             catch (Exception ex)
             {
                 LogCrash("App.OnLaunched", ex);
+                BootTrace($"OnLaunched THREW: {ex.GetType().Name}: {ex.Message}");
                 throw;
             }
+        }
+
+        private static void BootTrace(string msg)
+        {
+            try
+            {
+                File.AppendAllText(Path.Combine(AppSettings.LogsDir, "boot.log"),
+                    $"[{DateTime.Now:O}] PID={Environment.ProcessId} {msg}{Environment.NewLine}");
+            }
+            catch { }
         }
 
         private static string GetBaseUrl()
