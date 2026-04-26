@@ -221,6 +221,10 @@ namespace RaceCorProDrive.Auth
                 return;
 
             _apiClient.SetAuthToken(tokens.AccessToken);
+            // Same JWT, two surfaces: per-screen REST + calc POST.
+            // CalcClient sends Bearer prophylactically; web-api ignores it
+            // today but Phase 9b will gate calc on it.
+            CalcClient.Shared.SetBearerToken(tokens.AccessToken);
 
             try
             {
@@ -257,6 +261,7 @@ namespace RaceCorProDrive.Auth
             var expiresAt = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
             _tokenStore.SaveTokens(response.AccessToken, response.RefreshToken ?? "", expiresAt);
             _apiClient.SetAuthToken(response.AccessToken);
+            CalcClient.Shared.SetBearerToken(response.AccessToken);
         }
 
         /// <summary>
@@ -267,6 +272,8 @@ namespace RaceCorProDrive.Auth
             _tokenStore.ClearTokens();
             _currentUser = null;
             _apiClient.SetAuthToken(null);
+            // Same JWT, two surfaces. Clear both.
+            CalcClient.Shared.SetBearerToken(null);
         }
 
         private class AuthState
