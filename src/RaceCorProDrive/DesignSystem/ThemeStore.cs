@@ -104,8 +104,7 @@ namespace RaceCorProDrive.DesignSystem
 
         private ThemeStore()
         {
-            var stored = Windows.Storage.ApplicationData.Current.LocalSettings
-                .Values[DefaultsKey] as string;
+            var stored = RaceCorProDrive.Support.AppSettings.Get(DefaultsKey);
             _selectedSlug = string.IsNullOrEmpty(stored) ? AutoSlug : stored!;
             _activeSlug = _selectedSlug == AutoSlug ? "default" : _selectedSlug;
         }
@@ -249,7 +248,7 @@ namespace RaceCorProDrive.DesignSystem
 
         private void SaveSelected()
         {
-            Windows.Storage.ApplicationData.Current.LocalSettings.Values[DefaultsKey] = _selectedSlug;
+            RaceCorProDrive.Support.AppSettings.Set(DefaultsKey, _selectedSlug);
         }
 
         private static bool ContainsSlug(IReadOnlyList<ThemeSet> sets, string slug)

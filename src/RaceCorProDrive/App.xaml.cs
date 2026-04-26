@@ -1,40 +1,61 @@
+using System;
+using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.DesignSystem;
-using Windows.Storage;
+using RaceCorProDrive.Support;
 
 namespace RaceCorProDrive
 {
     public partial class App : Application
     {
-        // Dev override via Windows.Storage.ApplicationData.Current.LocalSettings
-        // key "racecor.dev.baseUrl"; production default otherwise.
+        // Dev override via AppSettings key "racecor.dev.baseUrl"; production default otherwise.
         private const string DefaultBaseUrl = "https://prodrive.racecor.io";
 
         public App()
         {
+            // Catch crashes that would otherwise silently exit the process —
+            // unpackaged WinUI 3 swallows startup exceptions by default.
+            this.UnhandledException += (s, e) => LogCrash("XamlUnhandled", e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                if (e.ExceptionObject is Exception ex) LogCrash("DomainUnhandled", ex);
+            };
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => LogCrash("UnobservedTask", e.Exception);
+
             this.InitializeComponent();
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            var window = new MainWindow();
-            window.Activate();
-
-            // Kick off design-token fetch fire-and-forget. If it fails we keep
-            // compile-time defaults from Tokens.cs. TokensChanged event fires
-            // if the fetched tokens differ, letting UI redraw if bound.
-            _ = TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
+            try
+            {
+                var window = new MainWindow();
+                window.Activate();
+                _ = TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
+            }
+            catch (Exception ex)
+            {
+                LogCrash("App.OnLaunched", ex);
+                throw;
+            }
         }
 
         private static string GetBaseUrl()
         {
-            var settings = ApplicationData.Current.LocalSettings;
-            if (settings.Values.TryGetValue("racecor.dev.baseUrl", out var v) && v is string url && !string.IsNullOrWhiteSpace(url))
+            var url = AppSettings.Get("racecor.dev.baseUrl");
+            return string.IsNullOrWhiteSpace(url) ? DefaultBaseUrl : url!;
+        }
+
+        private static void LogCrash(string source, Exception ex)
+        {
+            try
             {
-                return url;
+                var path = Path.Combine(AppSettings.LogsDir, "crash.log");
+                File.AppendAllText(path,
+                    $"[{DateTime.Now:O}] {source}{Environment.NewLine}{ex}{Environment.NewLine}{Environment.NewLine}");
             }
-            return DefaultBaseUrl;
+            catch { /* logging failures shouldn't make crashes worse */ }
         }
     }
 }

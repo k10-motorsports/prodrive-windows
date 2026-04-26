@@ -277,29 +277,20 @@ namespace RaceCorProDrive.Auth
 
         private void SaveAuthState(AuthState state)
         {
-            var json = JsonSerializer.Serialize(state);
-            var appData = Windows.Storage.ApplicationData.Current;
-            appData.LocalSettings.Values["auth_state"] = json;
+            RaceCorProDrive.Support.AppSettings.Set("auth_state", JsonSerializer.Serialize(state));
         }
 
         private AuthState? LoadAuthState()
         {
-            var appData = Windows.Storage.ApplicationData.Current;
-            if (appData.LocalSettings.Values.TryGetValue("auth_state", out var json))
-            {
-                try
-                {
-                    return JsonSerializer.Deserialize<AuthState>(json.ToString() ?? "");
-                }
-                catch { }
-            }
-            return null;
+            var json = RaceCorProDrive.Support.AppSettings.Get("auth_state");
+            if (string.IsNullOrEmpty(json)) return null;
+            try { return JsonSerializer.Deserialize<AuthState>(json); }
+            catch { return null; }
         }
 
         private void ClearAuthState()
         {
-            var appData = Windows.Storage.ApplicationData.Current;
-            appData.LocalSettings.Values.Remove("auth_state");
+            RaceCorProDrive.Support.AppSettings.Remove("auth_state");
         }
 
         private static Dictionary<string, string> ParseQueryString(string query)

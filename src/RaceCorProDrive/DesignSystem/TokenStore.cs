@@ -39,8 +39,7 @@ namespace RaceCorProDrive.DesignSystem
 
         private TokenStore()
         {
-            var cacheDir = ApplicationData.Current.LocalCacheFolder.Path;
-            _cachePath = Path.Combine(cacheDir, "racecor-tokens.json");
+            _cachePath = Path.Combine(AppSettings.CacheDir, "racecor-tokens.json");
             LoadFromDiskIfAvailable();
         }
 

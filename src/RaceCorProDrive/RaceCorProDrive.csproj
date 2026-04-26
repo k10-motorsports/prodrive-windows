@@ -25,6 +25,7 @@
     <Company>K10 Motorsports</Company>
     <Product>RaceCor Pro Drive</Product>
     <Copyright>Copyright (c) 2026 K10 Motorsports / Kevin Conboy. All rights reserved.</Copyright>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

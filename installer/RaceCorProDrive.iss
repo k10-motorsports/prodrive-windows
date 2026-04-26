@@ -107,3 +107,88 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 ; always reinstall after a bad release and would be furious if their
 ; tuned HUD layout disappeared. They can delete the folder manually.
 Type: filesandordirs; Name: "{app}"
+
+[Code]
+// Find SimHub install dir by checking common locations. SimHub doesn't
+// register a single canonical path so we probe.
+function FindSimHubDir(): String;
+var
+  candidates: array of String;
+  i: Integer;
+begin
+  Result := '';
+  SetArrayLength(candidates, 5);
+  candidates[0] := ExpandConstant('{pf}\SimHub');
+  candidates[1] := ExpandConstant('{pf32}\SimHub');
+  candidates[2] := ExpandConstant('{commonpf}\SimHub');
+  candidates[3] := ExpandConstant('{commonpf32}\SimHub');
+  candidates[4] := ExpandConstant('{localappdata}\Programs\SimHub');
+  for i := 0 to GetArrayLength(candidates) - 1 do
+  begin
+    if FileExists(candidates[i] + '\SimHubWPF.exe') then
+    begin
+      Result := candidates[i];
+      Exit;
+    end;
+  end;
+end;
+
+// Inno Setup helper: collect every (non-dir) file directly under `dir`.
+function ListPluginFiles(dir: String; var outFiles: TArrayOfString): Boolean;
+var
+  fr: TFindRec;
+begin
+  Result := False;
+  SetArrayLength(outFiles, 0);
+  if FindFirst(dir + '\*', fr) then
+  begin
+    try
+      repeat
+        if (fr.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
+        begin
+          SetArrayLength(outFiles, GetArrayLength(outFiles) + 1);
+          outFiles[GetArrayLength(outFiles) - 1] := dir + '\' + fr.Name;
+        end;
+      until not FindNext(fr);
+      Result := GetArrayLength(outFiles) > 0;
+    finally
+      FindClose(fr);
+    end;
+  end;
+end;
+
+// Copy every file from {app}\Plugin into the SimHub install dir so
+// SimHub auto-loads RaceCorProDrive.dll on next start. Runs after the
+// main file copy so {app}\Plugin already exists.
+procedure InstallSimHubPlugin();
+var
+  simHub: String;
+  pluginSrc: String;
+  files: TArrayOfString;
+  i: Integer;
+  dest: String;
+begin
+  pluginSrc := ExpandConstant('{app}\Plugin');
+  if not DirExists(pluginSrc) then Exit;
+  simHub := FindSimHubDir();
+  if simHub = '' then
+  begin
+    MsgBox('SimHub was not detected on this machine.' + #13#10 + #13#10 +
+           'The RaceCor SimHub plugin DLLs are at:' + #13#10 + pluginSrc + #13#10 + #13#10 +
+           'After installing SimHub, copy those files into the SimHub install folder ' +
+           '(next to SimHubWPF.exe) to enable the plugin.',
+           mbInformation, MB_OK);
+    Exit;
+  end;
+  if not ListPluginFiles(pluginSrc, files) then Exit;
+  for i := 0 to GetArrayLength(files) - 1 do
+  begin
+    dest := simHub + '\' + ExtractFileName(files[i]);
+    FileCopy(files[i], dest, False);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then InstallSimHubPlugin();
+end;
