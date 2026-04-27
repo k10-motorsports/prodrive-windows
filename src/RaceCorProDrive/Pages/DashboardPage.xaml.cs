@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.Api;
@@ -21,6 +25,20 @@ namespace RaceCorProDrive.Pages
     /// </summary>
     public sealed partial class DashboardPage : Page
     {
+        // ── Server-canonical Race-Now state ────────────────────────
+        // Cached evaluation from /api/v1/calc/race-now. Re-fetched
+        // whenever the When-profile shifts (new poll, hour rollover,
+        // sign-in change). The view renders evaluation.Headline +
+        // evaluation.Detail verbatim — same numbers as the web's
+        // ShouldIRaceNow chip, no local synthesis.
+        private RaceNowEvaluation? _raceNowEvaluation;
+        private List<RaceNowAlternative> _raceNowAlternatives = new();
+        private string? _raceNowError;
+        // peakHourStart of the last profile we fetched for; used to
+        // dedupe redundant fetches when the dashboard re-pumps but
+        // the When-profile hasn't shifted.
+        private int? _lastFetchedProfileKey;
+
         public DashboardPage()
         {
             this.InitializeComponent();
@@ -62,6 +80,20 @@ namespace RaceCorProDrive.Pages
             LoadingRing.IsActive = dash == null;
             MainContent.Children.Clear();
 
+            // Trigger a canonical Race-Now refetch whenever the When
+            // profile shifts. Keying on PeakHourStart (an int) is enough
+            // — every new poll where the user's data has actually changed
+            // will move that value, and hour rollover shifts it on its own.
+            // Fire-and-forget; the response handler re-enters this method
+            // via DispatcherQueue.TryEnqueue so the UI re-renders with
+            // the fresh evaluation.
+            var newProfileKey = dash?.When?.PeakHourStart;
+            if (newProfileKey != _lastFetchedProfileKey)
+            {
+                _lastFetchedProfileKey = newProfileKey;
+                _ = RefreshRaceNowAsync(dash);
+            }
+
             switch (TabsBar.Selected)
             {
                 case DashboardTabs.Tab.Performance:
@@ -87,32 +119,27 @@ namespace RaceCorProDrive.Pages
             MainContent.Children.Add(BuildVizPlaceholder("Driver DNA"));
         }
 
-        private static ShouldYouRacePanel BuildShouldYouRace(Dashboard? dash)
+        // BuildShouldYouRace is now an instance method (not static) because it
+        // reads cached server state from this page. The verdict + headline +
+        // detail come straight from /api/v1/calc/race-now via CalcClient —
+        // see RefreshRaceNowAsync below.
+        private ShouldYouRacePanel BuildShouldYouRace(Dashboard? dash)
         {
             var panel = new ShouldYouRacePanel();
 
             if (dash?.When is { } when)
             {
+                // Detail body still derived from dash.WhenPanel (server's
+                // pre-rendered Strengths/Watch-Out copy), plus a "now"
+                // annotation that uses the local clock for context.
                 var hour = DateTime.Now.Hour;
                 var inPeak = IsInWindow(hour, when.PeakHourStart, when.WindowSize);
                 var inWorst = IsInWindow(hour, when.WorstHourStart, when.WindowSize);
 
-                var verdict =
-                    inPeak ? Verdict.Good :
-                    inWorst ? Verdict.Bad :
-                    Verdict.Marginal;
-
-                panel.Verdict = verdict;
-                panel.Title = inPeak ? "Go for it"
-                            : inWorst ? "Skip this window"
-                            : "Marginal";
-                panel.Reason = inPeak ? $"You're in your peak window ({when.PeakHours})."
-                              : inWorst ? $"This is your weakest window ({when.WorstHours})."
-                              : "Not your best or worst — okay to race but temper expectations.";
-
+                ShouldYouRacePanel.DetailModel? detail = null;
                 if (dash.WhenPanel is { } wp)
                 {
-                    panel.Detail = new ShouldYouRacePanel.DetailModel
+                    detail = new ShouldYouRacePanel.DetailModel
                     {
                         PeakWindow = wp.Strengths is { } s ? $"{s.Days}, {s.Hours}" : null,
                         PeakDelta = wp.Strengths?.AvgIRatingDelta is double sd ? FormatDelta(sd) : null,
@@ -121,6 +148,32 @@ namespace RaceCorProDrive.Pages
                         NowDescription = NowAnnotation(hour, inPeak, inWorst),
                     };
                 }
+
+                if (_raceNowEvaluation is { } evaluation)
+                {
+                    // Server values rendered verbatim — same headline + detail
+                    // strings the web's ShouldIRaceNow component shows.
+                    panel.Verdict = MapServerVerdict(evaluation.Verdict);
+                    panel.Title = evaluation.Headline;
+                    panel.Reason = evaluation.Detail;
+                }
+                else if (_raceNowError is { } err)
+                {
+                    // Fetch failed — surface the message instead of sitting
+                    // on "Calculating…" forever.
+                    panel.Verdict = Verdict.Marginal;
+                    panel.Title = "Verdict unavailable";
+                    panel.Reason = err;
+                }
+                else
+                {
+                    // In-flight fetch.
+                    panel.Verdict = Verdict.Unknown;
+                    panel.Title = "Calculating…";
+                    panel.Reason = "Loading current race-now verdict from server.";
+                }
+
+                if (detail is { }) panel.Detail = detail;
             }
             else
             {
@@ -129,6 +182,83 @@ namespace RaceCorProDrive.Pages
                 panel.Reason = "Add a few more races to get a race-now advisory.";
             }
             return panel;
+        }
+
+        // Server's six-tier vocabulary (mirrors SlotTier) collapsed into
+        // the existing four-case Verdict enum:
+        //   best, good                  → Good
+        //   clean-side, messy-side      → Marginal
+        //   risky                       → Bad
+        //   insufficient (or unknown)   → Unknown
+        // Headline string still renders the canonical verdict text — this
+        // mapping only drives the icon/color on the chip.
+        private static Verdict MapServerVerdict(string verdict) => verdict switch
+        {
+            "best" => Verdict.Good,
+            "good" => Verdict.Good,
+            "clean-side" => Verdict.Marginal,
+            "messy-side" => Verdict.Marginal,
+            "risky" => Verdict.Bad,
+            _ => Verdict.Unknown, // "insufficient" or unrecognised
+        };
+
+        // Refetches the canonical race-now verdict from web-api. Called
+        // from UpdateForCurrentSnapshot whenever the When-profile shifts.
+        // Bridges the typed Dashboard.WhenProfile to the calc API's opaque
+        // JsonElement profile via JSON round-trip — the shapes are
+        // compatible (both come from the same server-side computeWhenProfile).
+        private async Task RefreshRaceNowAsync(Dashboard? dash)
+        {
+            if (dash?.When is not { } when)
+            {
+                _raceNowEvaluation = null;
+                _raceNowAlternatives = new();
+                _raceNowError = null;
+                DispatcherQueue.TryEnqueue(UpdateForCurrentSnapshot);
+                return;
+            }
+
+            try
+            {
+                // Typed → opaque bridge. Same JsonSerializerOptions as the
+                // rest of the API surface so casing (camelCase) matches.
+                var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                var profileJson = JsonSerializer.Serialize(when, options);
+                using var doc = JsonDocument.Parse(profileJson);
+                var profile = doc.RootElement.Clone();
+
+                // Send the user's IANA timezone so the verdict targets THEIR
+                // local hour, not UTC. .NET on Windows surfaces tzdb names
+                // in TimeZoneInfo.Local.HasIanaId; otherwise convert from
+                // the Windows zone-name registry.
+                var tz = TimeZoneInfo.Local.HasIanaId
+                    ? TimeZoneInfo.Local.Id
+                    : TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id, out var iana)
+                        ? iana
+                        : "UTC";
+
+                var response = await CalcClient.Shared.FetchRaceNowAsync(
+                    profile: profile,
+                    timeZone: tz);
+
+                _raceNowEvaluation = response.Evaluation;
+                _raceNowAlternatives = response.Alternatives;
+                _raceNowError = response.Evaluation == null
+                    ? "Server returned no evaluation (insufficient data)"
+                    : null;
+
+                Debug.WriteLine($"[CalcClient] race-now ok — verdict={response.Evaluation?.Verdict ?? "null"}, tz={tz}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CalcClient] race-now fetch failed: {ex}");
+                _raceNowEvaluation = null;
+                _raceNowAlternatives = new();
+                _raceNowError = ex.Message;
+            }
+
+            // Re-render with whatever just landed.
+            DispatcherQueue.TryEnqueue(UpdateForCurrentSnapshot);
         }
 
         private static StrengthsWatchOutPanel BuildStrengthsWatchOut(Dashboard? dash)
