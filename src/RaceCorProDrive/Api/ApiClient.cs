@@ -150,9 +150,31 @@ namespace RaceCorProDrive.Api
         /// <summary>GET /api/v1/me — current user row.</summary>
         public Task<Me?> MeAsync() => GetAsync<Me>($"{BaseUrl}/api/v1/me");
 
-        /// <summary>GET /api/v1/dashboard — full dashboard payload.</summary>
-        public Task<Dashboard?> DashboardAsync() =>
-            GetAsync<Dashboard>($"{BaseUrl}/api/v1/dashboard");
+        /// <summary>
+        /// GET /api/v1/dashboard — full dashboard payload.
+        ///
+        /// Passes the device's IANA timezone so the server buckets the
+        /// returned WhenProfile.byHour / rankedSlots in the user's
+        /// local hour-of-week. Without this the server defaults to UTC
+        /// and rankedSlots[localHour] returns the wrong row, producing
+        /// inverted Race-Now verdicts vs the web dashboard. See
+        /// prodrive-server PR #28 for the matching server change.
+        ///
+        /// .NET on Windows surfaces tzdb names directly when
+        /// HasIanaId is true; otherwise convert from the Windows zone
+        /// registry (same shape DashboardPage.RefreshRaceNowAsync
+        /// already uses to send TZ to /calc/race-now).
+        /// </summary>
+        public Task<Dashboard?> DashboardAsync()
+        {
+            var tz = TimeZoneInfo.Local.HasIanaId
+                ? TimeZoneInfo.Local.Id
+                : TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id, out var iana)
+                    ? iana
+                    : "UTC";
+            var encoded = Uri.EscapeDataString(tz);
+            return GetAsync<Dashboard>($"{BaseUrl}/api/v1/dashboard?tz={encoded}");
+        }
 
         /// <summary>GET /api/v1/sessions — paginated race list.</summary>
         public Task<SessionsResponse?> SessionsAsync(int limit = 50, int offset = 0, string category = "all") =>
