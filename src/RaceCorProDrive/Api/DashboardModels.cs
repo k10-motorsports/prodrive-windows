@@ -225,6 +225,29 @@ namespace RaceCorProDrive.Api
         [JsonPropertyName("seriesId")]       public int SeriesId { get; set; }
         [JsonPropertyName("raceLapLimit")]   public int? RaceLapLimit { get; set; }
         [JsonPropertyName("raceTimeLimit")]  public int? RaceTimeLimit { get; set; }
+        // Server-baked presentation strings + colors. Nullable so old
+        // server responses (pre-prodrive-server PR #31) deserialize
+        // without error; renderer falls back to local formatters when
+        // null. Once server is deployed, every response populates this
+        // and clients render verbatim with no drift across web /
+        // macOS / iOS / tvOS / Windows.
+        [JsonPropertyName("viewModel")]      public NextRaceIdeaViewModel? ViewModel { get; set; }
+    }
+
+    /// <summary>
+    /// Mirrors <c>RaceSuggestion.viewModel</c> on the server side
+    /// (<c>apps/web-api/src/calc/next-race-ideas.ts</c>). All clients
+    /// render these strings verbatim — no client-side score-color
+    /// thresholding, no client-side countdown formatting.
+    /// </summary>
+    public class NextRaceIdeaViewModel
+    {
+        [JsonPropertyName("scoreColorHex")]    public string ScoreColorHex { get; set; } = "";
+        [JsonPropertyName("scoreTierLabel")]   public string ScoreTierLabel { get; set; } = "";
+        [JsonPropertyName("startsInLabel")]    public string StartsInLabel { get; set; } = "";
+        [JsonPropertyName("durationLabel")]    public string? DurationLabel { get; set; }
+        [JsonPropertyName("strategyLabel")]    public string StrategyLabel { get; set; } = "";
+        [JsonPropertyName("strategyColorHex")] public string StrategyColorHex { get; set; } = "";
     }
 
     public class WhenPanelSide
