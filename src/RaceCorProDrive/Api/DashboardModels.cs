@@ -178,6 +178,33 @@ namespace RaceCorProDrive.Api
         [JsonPropertyName("windowSize")]        public int WindowSize { get; set; }
         [JsonPropertyName("insights")]          public List<WhenInsight> Insights { get; set; } = new();
         [JsonPropertyName("heatmapData")]       public List<HeatmapCell> HeatmapData { get; set; } = new();
+        // Quantile-ranked tier for every hour 0–23. The Race-Now calc
+        // engine reads `rankedSlots[currentHour].tier` to produce the
+        // six-tier verdict; without this field on the typed class, the
+        // JSON round-trip in DashboardPage.RefreshRaceNowAsync (typed
+        // WhenProfile → JsonSerializer.Serialize → JsonDocument.Parse →
+        // re-send to /calc/race-now) drops the property and the server
+        // falls back to "insufficient". That's the divergence where
+        // native clients read "Not enough data yet" while the web app
+        // showed "Cleaner half" for the same hour.
+        [JsonPropertyName("rankedSlots")]       public List<RankedSlot> RankedSlots { get; set; } = new();
+    }
+
+    /// <summary>
+    /// One row of the server's <c>WhenProfile.rankedSlots</c> table — the
+    /// quantile rank of an hour-of-week against this driver's own
+    /// distribution. The calc engine reads <c>tier</c> to pick a verdict;
+    /// the rest of the fields are kept so the round-trip is lossless.
+    /// </summary>
+    public class RankedSlot
+    {
+        [JsonPropertyName("hour")]          public int Hour { get; set; }
+        [JsonPropertyName("rank")]          public int? Rank { get; set; }
+        [JsonPropertyName("percentile")]    public double? Percentile { get; set; }
+        [JsonPropertyName("tier")]          public string Tier { get; set; } = "";
+        [JsonPropertyName("sessionCount")]  public int SessionCount { get; set; }
+        [JsonPropertyName("avgIncidents")]  public double AvgIncidents { get; set; }
+        [JsonPropertyName("avgPosition")]   public double? AvgPosition { get; set; }
     }
 
     public class NextRaceIdeaEntry
