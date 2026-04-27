@@ -143,16 +143,9 @@ namespace RaceCorProDrive.Api
         public List<ScatterBucket> Buckets { get; set; } = new();
     }
 
-    public sealed class ScatterBucket
-    {
-        public int Day { get; set; }       // 0=Sun, 6=Sat (JS convention)
-        public int Hour { get; set; }      // 0–23 in requested time zone
-        public int Count { get; set; }
-        public double IrDeltaSum { get; set; }
-        public double SrDeltaSum { get; set; }
-        public int IncidentsSum { get; set; }
-        public double AvgIncidents { get; set; }
-    }
+    // ScatterBucket is defined in DashboardModels.cs — same shape, with
+    // explicit [JsonPropertyName] attrs so the dashboard surface (which
+    // doesn't set a CamelCase naming policy) deserializes correctly.
 
     // ─── 5. When-engine ──────────────────────────────────────────────
 
@@ -189,27 +182,12 @@ namespace RaceCorProDrive.Api
         public WhenPanelView Panel { get; set; } = new();
     }
 
-    public sealed class WhenInsight
-    {
-        public string Type { get; set; } = ""; // "positive" | "negative" | "neutral"
-        public string Text { get; set; } = "";
-    }
-
-    /// <summary>Pre-rendered Strengths / Watch Out panel. Render verbatim.</summary>
-    public sealed class WhenPanelView
-    {
-        public WhenPanelSide? Strengths { get; set; }
-        public WhenPanelSide? WatchOut { get; set; }
-    }
-
-    public sealed class WhenPanelSide
-    {
-        public string Days { get; set; } = "";
-        public string Hours { get; set; } = "";
-        public double? AvgIRatingDelta { get; set; }
-        public string Paragraph { get; set; } = "";
-        public List<WhenInsight> Bullets { get; set; } = new();
-    }
+    // WhenInsight, WhenPanelView, WhenPanelSide are defined in
+    // DashboardModels.cs — same shapes, with explicit [JsonPropertyName]
+    // attrs so the dashboard surface (which doesn't set a CamelCase
+    // naming policy) deserializes correctly. CalcClient's CamelCase
+    // serializer respects those attrs too, so the same types work on
+    // both surfaces.
 
     // ─── 6. Race-Now verdict ─────────────────────────────────────────
 
