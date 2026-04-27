@@ -230,17 +230,45 @@ namespace RaceCorProDrive.Api
 
     public sealed class RaceNowEvaluation
     {
-        public string Verdict { get; set; } = ""; // "good" | "marginal" | "risky" | "insufficient"
+        /// <summary>
+        /// Six-tier vocabulary (mirrors server's <c>SlotTier</c>):
+        /// <c>"best" | "good" | "clean-side" | "messy-side" | "risky" | "insufficient"</c>.
+        /// Was four tiers earlier (good/marginal/risky/insufficient); the
+        /// server moved to quantile-ranked tiers per
+        /// <c>apps/web-api/src/calc/race-now-verdict.ts</c>.
+        /// </summary>
+        public string Verdict { get; set; } = "";
+        /// <summary>
+        /// Short verdict text for the chip itself, e.g. "Risky window".
+        /// Required field. Missing this caused decode failures on macOS;
+        /// same trap on Windows without it.
+        /// </summary>
+        public string Headline { get; set; } = "";
+        /// <summary>
+        /// One-sentence subtitle, e.g. "7.8 inc/race near 4 PM (+1.5 vs your avg)
+        /// • P16.5 avg finish".
+        /// </summary>
         public string Detail { get; set; } = "";
+        /// <summary>
+        /// Raw numbers for a "details" panel; large + evolving so kept opaque.
+        /// </summary>
         public JsonElement Stats { get; set; }
     }
 
+    /// <summary>
+    /// Server type: <c>PracticeAlternative</c> from
+    /// <c>apps/web-api/src/calc/race-now-verdict.ts</c>. Wire field names —
+    /// <c>kind</c>, <c>title</c>, <c>detail</c>, <c>trackName?</c>,
+    /// <c>carModel?</c> — not the <c>label</c>/<c>reason</c> placeholders the
+    /// earlier scaffold used.
+    /// </summary>
     public sealed class RaceNowAlternative
     {
-        public string Label { get; set; } = "";
-        public string TrackName { get; set; } = "";
-        public string CarModel { get; set; } = "";
-        public string Reason { get; set; } = "";
+        public string Kind { get; set; } = ""; // "practice" | "time-trial" | "hot-lap"
+        public string Title { get; set; } = "";
+        public string Detail { get; set; } = "";
+        public string? TrackName { get; set; }
+        public string? CarModel { get; set; }
     }
 
     // ─── 7. Race summary ─────────────────────────────────────────────
