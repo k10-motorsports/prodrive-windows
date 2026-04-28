@@ -29,6 +29,11 @@
             Loaded="OnNavViewLoaded">
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Dashboard" x:Name="NavDashboard" Tag="dashboard" />
+                <NavigationViewItem Content="Library" x:Name="NavLibrary" Tag="library">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE786;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <Frame x:Name="ContentFrame" />
         </NavigationView>

@@ -1,9 +1,9 @@
-# dev-build.ps1 — local debug-build loop for the WinUI 3 host.
+# dev-build.ps1 - local debug-build loop for the WinUI 3 host.
 #
 # Builds the host straight from your Mac source via Parallels' shared
 # folder, then launches the .exe. ~30 sec per cycle vs. 5 min through CI.
 #
-# Skips the Inno Setup installer, overlay download, and plugin download —
+# Skips the Inno Setup installer, overlay download, and plugin download -
 # those aren't needed to verify the host launches and renders a window.
 # Re-run the full CI pipeline (push a v* tag) when you want a real
 # user-facing release.
@@ -21,7 +21,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ─── Locate the source on the Parallels share ─────────────────────────
+# ----Locate the source on the Parallels share--------------------------
 if (-not $Source) {
   $candidates = @(
     "Z:\Documents\K10\racecor-prodrive\prodrive-windows",
@@ -45,7 +45,7 @@ if (-not $Source) {
 $proj = Join-Path $Source "src\RaceCorProDrive\RaceCorProDrive.csproj"
 Write-Host "Source: $Source" -ForegroundColor Cyan
 
-# ─── Locate MSBuild (.NET Framework, from VS) ──────────────────────────
+# ----Locate MSBuild (.NET Framework, from VS)---------------------------
 # We discovered the hard way that dotnet's MSBuild causes XamlCompiler.exe
 # to silent-crash on WinUI 3 1.5/1.6 unpackaged. VS Build Tools' msbuild
 # (.NET Framework) is the only one that works.
@@ -68,7 +68,7 @@ if (-not $msbuild) {
 }
 Write-Host "MSBuild: $msbuild" -ForegroundColor Cyan
 
-# ─── Determine arch ────────────────────────────────────────────────────
+# ----Determine arch-----------------------------------------------------
 $archEnv = $env:PROCESSOR_ARCHITECTURE
 if ($archEnv -eq "ARM64") {
   $msbuildPlatform = "ARM64"
@@ -79,7 +79,7 @@ if ($archEnv -eq "ARM64") {
 }
 Write-Host "Arch: $msbuildPlatform / $rid" -ForegroundColor Cyan
 
-# ─── Build to a local Windows path for speed ───────────────────────────
+# ----Build to a local Windows path for speed----------------------------
 # Network-share filesystems are 5-10x slower for thousands-of-small-files
 # I/O. Redirect MSBuild's obj/ and publish/ to a local NTFS path; only
 # source reads come from the share.
@@ -113,7 +113,7 @@ if (-not $SkipBuild) {
   Write-Host "Build OK in $($sw.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 }
 
-# ─── Tail the boot log in a side window so we see startup live ─────────
+# ----Tail the boot log in a side window so we see startup live----------
 $logsDir = Join-Path $env:LOCALAPPDATA "RaceCorProDrive\Logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
 $bootLog = Join-Path $logsDir "boot.log"
@@ -122,7 +122,7 @@ $crashLog = Join-Path $logsDir "crash.log"
 "" | Set-Content $bootLog
 if (Test-Path $crashLog) { Remove-Item $crashLog }
 
-# ─── Launch ────────────────────────────────────────────────────────────
+# ----Launch-------------------------------------------------------------
 $exe = Join-Path $publishDir "RaceCorProDrive.exe"
 Write-Host "`nLaunching $exe" -ForegroundColor Yellow
 $proc = Start-Process -FilePath $exe -PassThru
@@ -131,13 +131,13 @@ Start-Sleep -Seconds 3
 
 # Show what happened
 if ($proc.HasExited) {
-  Write-Host "`nProcess exited (code=$($proc.ExitCode)) within 3s — likely crashed." -ForegroundColor Red
+  Write-Host "`nProcess exited (code=$($proc.ExitCode)) within 3s - likely crashed." -ForegroundColor Red
 } else {
   Write-Host "`nProcess still running. Window should be visible." -ForegroundColor Green
 }
-Write-Host "`n── boot.log ──" -ForegroundColor Cyan
+Write-Host "`n---boot.log---" -ForegroundColor Cyan
 if (Test-Path $bootLog) { Get-Content $bootLog } else { Write-Host "(no entries)" }
 if (Test-Path $crashLog) {
-  Write-Host "`n── crash.log ──" -ForegroundColor Red
+  Write-Host "`n---crash.log---" -ForegroundColor Red
   Get-Content $crashLog
 }

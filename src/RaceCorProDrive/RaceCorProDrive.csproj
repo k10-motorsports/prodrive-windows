@@ -33,6 +33,14 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.241114000" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    <!--
+      mDNS/Bonjour service discovery for the LAN bundle-share feature.
+      Zeroconf bundles a managed mDNS implementation, so the user does
+      NOT need Apple's Bonjour service installed. One-shot resolution
+      via ZeroconfResolver.ResolveAsync(...) is enough for the "click
+      Send → pick a Mac" UX; we don't need a continuous browser.
+    -->
+    <PackageReference Include="Zeroconf" Version="3.6.11" />
   </ItemGroup>
 
   <ItemGroup>
