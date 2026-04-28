@@ -89,6 +89,41 @@ $publishDir = Join-Path $BuildRoot "publish\$rid"
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 
 if (-not $SkipBuild) {
+  # Side-load System.Security.Permissions 6.0.0 next to the in-process
+  # XAML compiler task DLL — without it, MSBuild can't load the task
+  # and every InitializeComponent/x:Name reference fails to compile.
+  # Mirrors the equivalent step in .github/workflows/release.yml.
+  Write-Host "`nRestore + patch XAML compiler task deps..." -ForegroundColor Yellow
+  $env:NUGET_PACKAGES = "$env:USERPROFILE\.nuget\packages"
+  & dotnet restore $proj -p:RuntimeIdentifier=$rid -p:Platform=$msbuildPlatform | Out-Null
+  if ($LASTEXITCODE -ne 0) { Write-Host "restore failed" -ForegroundColor Red; exit 1 }
+  $compilerDll = Get-ChildItem -Recurse -Filter "Microsoft.UI.Xaml.Markup.Compiler.dll" -Path "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match "tools\\net6\.0" } |
+    Select-Object -First 1
+  if (-not $compilerDll) { Write-Host "Compiler DLL not found in nuget cache" -ForegroundColor Red; exit 1 }
+  $toolsDir = $compilerDll.Directory.FullName
+  $existingSysPerms = Join-Path $toolsDir "System.Security.Permissions.dll"
+  if (-not (Test-Path $existingSysPerms)) {
+    $sysPerms = Get-ChildItem -Recurse -Filter "System.Security.Permissions.dll" -Path "$env:USERPROFILE\.nuget\packages\system.security.permissions" -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match "6\.0\.0\\lib\\net6\.0" } |
+      Select-Object -First 1
+    if (-not $sysPerms) {
+      Write-Host "Fetching System.Security.Permissions 6.0.0..." -ForegroundColor Yellow
+      $tmp = Join-Path $env:TEMP "racecor-syspermfetch"
+      New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+      "<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><TargetFramework>net6.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=""System.Security.Permissions"" Version=""6.0.0"" /></ItemGroup></Project>" | Set-Content (Join-Path $tmp "tmp.csproj")
+      Push-Location $tmp
+      & dotnet restore tmp.csproj | Out-Null
+      Pop-Location
+      $sysPerms = Get-ChildItem -Recurse -Filter "System.Security.Permissions.dll" -Path "$env:USERPROFILE\.nuget\packages\system.security.permissions" |
+        Where-Object { $_.FullName -match "6\.0\.0\\lib\\net6\.0" } |
+        Select-Object -First 1
+    }
+    if (-not $sysPerms) { Write-Host "Could not obtain System.Security.Permissions 6.0.0" -ForegroundColor Red; exit 1 }
+    Copy-Item -Force $sysPerms.FullName $toolsDir
+    Write-Host "Patched: $toolsDir\System.Security.Permissions.dll" -ForegroundColor Green
+  }
+
   Write-Host "`nBuilding..." -ForegroundColor Yellow
   $sw = [System.Diagnostics.Stopwatch]::StartNew()
   & $msbuild $proj `
