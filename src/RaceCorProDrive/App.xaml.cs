@@ -73,6 +73,19 @@ namespace RaceCorProDrive
         /// running. Marshals back to the UI thread because activation
         /// callbacks fire on a worker thread.
         /// </summary>
+        /// <summary>
+        /// Called by LoginPage after the loopback OAuth flow completes
+        /// successfully. Marshals to the UI thread to flip MainWindow
+        /// from the AuthFrame (LoginPage) to the NavView (Dashboard).
+        /// </summary>
+        public static void NotifySignInComplete()
+        {
+            BootTrace("NotifySignInComplete");
+            var dispatcher = _mainWindow?.DispatcherQueue;
+            if (dispatcher == null) return;
+            dispatcher.TryEnqueue(() => _mainWindow?.OnSignInComplete());
+        }
+
         public static void HandleProtocolActivation()
         {
             var uri = Program.ConsumePendingActivationUri();

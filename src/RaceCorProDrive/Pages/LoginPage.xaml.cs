@@ -20,8 +20,11 @@ namespace RaceCorProDrive.Pages
 
             try
             {
+                // Loopback HTTP flow: SignInAsync now blocks until the
+                // browser redirect arrives and the token exchange completes.
+                // When it returns successfully, we're authed.
                 await _authService.SignInAsync();
-                // Navigation handled by AuthService callback
+                App.NotifySignInComplete();
             }
             catch (Exception ex)
             {

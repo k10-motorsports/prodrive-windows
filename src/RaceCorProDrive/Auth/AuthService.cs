@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using RaceCorProDrive.Api;
@@ -115,48 +117,93 @@ namespace RaceCorProDrive.Auth
         }
 
         /// <summary>
-        /// Initiates the OAuth sign-in flow.
-        /// Opens the system browser to the authorization endpoint.
+        /// OAuth sign-in with loopback HTTP redirect — the canonical desktop
+        /// pattern (gh CLI, dotnet, every modern desktop OAuth client).
+        /// We bind a one-shot HttpListener to http://127.0.0.1:&lt;random&gt;/auth,
+        /// pass that as redirect_uri, then await the browser's redirect.
+        /// Awaits the full token exchange before returning, so callers can
+        /// transition to the authed shell synchronously.
+        ///
+        /// Why not racecor-native://: modern browsers (Chrome/Edge 88+)
+        /// silently drop server-initiated redirects to custom URI schemes
+        /// when there's no user gesture. Loopback HTTP is just a regular
+        /// redirect — works everywhere.
         /// </summary>
         public async Task SignInAsync()
         {
             var codeVerifier = PkceHelper.GenerateCodeVerifier();
             var codeChallenge = PkceHelper.GenerateCodeChallenge(codeVerifier);
             var state = Guid.NewGuid().ToString("N");
+            SaveAuthState(new AuthState { CodeVerifier = codeVerifier, State = state });
 
-            // Store for callback
-            var authState = new AuthState
-            {
-                CodeVerifier = codeVerifier,
-                State = state
-            };
-            SaveAuthState(authState);
+            var port = GetAvailableLoopbackPort();
+            var redirectUri = $"http://127.0.0.1:{port}/auth";
+            var listener = new HttpListener();
+            listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            listener.Start();
 
             var authUrl = $"{BaseUrl}/api/plugin-auth/authorize?" +
+                $"response_type=code&" +
                 $"client_id={ClientId}&" +
                 $"code_challenge={codeChallenge}&" +
                 $"code_challenge_method=S256&" +
                 $"state={state}&" +
-                $"redirect_uri={Uri.EscapeDataString(RedirectUri)}";
+                $"redirect_uri={Uri.EscapeDataString(redirectUri)}";
 
-            // Open system browser
-            // NOTE: For unpackaged apps, WebAuthenticationBroker is unreliable.
-            // Using Process.Start + protocol handler is the fallback.
             try
             {
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = authUrl,
-                    UseShellExecute = true
+                    UseShellExecute = true,
                 });
             }
             catch (Exception ex)
             {
+                listener.Stop();
                 throw new InvalidOperationException($"Failed to open browser: {ex.Message}", ex);
             }
 
-            // Protocol handler registration happens via assets/register-scheme.reg for dev
-            // In MSIX, register via Package.appxmanifest
+            try
+            {
+                // Wait for the browser to hit /auth?code=...&state=...
+                var ctx = await listener.GetContextAsync();
+                var callbackUri = ctx.Request.Url!.ToString();
+
+                // Send a friendly "you can close this" page so the user
+                // isn't staring at about:blank wondering if it worked.
+                var html =
+                    "<!doctype html><html><head><meta charset=utf-8><title>RaceCor Pro Drive</title>" +
+                    "<style>body{font-family:-apple-system,Segoe UI,sans-serif;background:#0A0A14;color:#fff;" +
+                    "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}" +
+                    ".c{text-align:center}h1{font-weight:600;margin:0 0 8px}p{opacity:.7;margin:0}</style></head>" +
+                    "<body><div class=c><h1>Sign-in complete</h1><p>You can close this tab and return to RaceCor Pro Drive.</p></div></body></html>";
+                var bytes = Encoding.UTF8.GetBytes(html);
+                ctx.Response.ContentType = "text/html; charset=utf-8";
+                ctx.Response.ContentLength64 = bytes.Length;
+                await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length);
+                ctx.Response.OutputStream.Close();
+
+                // Exchange the code for tokens (this is the heavy lift —
+                // talks to the auth server, hits PasswordVault, etc.).
+                await OnAuthCallbackAsync(callbackUri);
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+
+        private static int GetAvailableLoopbackPort()
+        {
+            // Bind to port 0; OS picks a free ephemeral port. Close, then
+            // reuse the number. Tiny race-condition window but in practice
+            // fine for local one-shot OAuth.
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+            return port;
         }
 
         /// <summary>
