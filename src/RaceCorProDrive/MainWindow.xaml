@@ -10,14 +10,24 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Title bar -->
+        <!-- Title bar.
+             Three columns: (1) brand title left, (2) actions right, and
+             (3) ~140px reserved for the system caption buttons (min/max/
+             close) which Win overlays into whatever element we hand to
+             SetTitleBar(...). Without this reserve column the user
+             actions render *under* the close button. -->
         <Grid x:Name="AppTitleBar" Height="40" Background="Transparent" VerticalAlignment="Top">
-            <TextBlock x:Name="AppTitle" Text="RaceCor Pro Drive" Margin="12,8,0,0"
-                       VerticalAlignment="Top"
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="140" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" x:Name="AppTitle" Text="RaceCor Pro Drive"
+                       Margin="12,0,0,0" VerticalAlignment="Center"
                        Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
                        FontSize="14" FontWeight="SemiBold" />
-            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Margin="0,0,12,0" Orientation="Horizontal" Spacing="8">
+            <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                        Orientation="Horizontal" Spacing="8">
                 <TextBlock x:Name="UserDisplay" Text="User"
                            Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
                            VerticalAlignment="Center" FontSize="12" />
