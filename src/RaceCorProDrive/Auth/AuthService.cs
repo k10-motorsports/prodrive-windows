@@ -22,7 +22,7 @@ namespace RaceCorProDrive.Auth
     public class AuthService
     {
         private const string ClientId = "racing.k10motorsports.prodrive.racecor.win";
-        private const string RedirectUri = "racecor-prodrive://auth";
+        private const string RedirectUri = "racecor-native://auth";
         private const string BaseUrl = "https://prodrive.racecor.io";
 
         private readonly TokenStore _tokenStore = new();

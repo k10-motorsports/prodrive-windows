@@ -24,9 +24,9 @@ $ErrorActionPreference = "Stop"
 # ----Locate the source on the Parallels share--------------------------
 if (-not $Source) {
   $candidates = @(
-    "Z:\Documents\K10\racecor-prodrive\prodrive-windows",
-    "\\Mac\Home\Documents\K10\racecor-prodrive\prodrive-windows",
-    "\\psf\Home\Documents\K10\racecor-prodrive\prodrive-windows"
+    "Z:\Documents\K10\racecor-native\prodrive-windows",
+    "\\Mac\Home\Documents\K10\racecor-native\prodrive-windows",
+    "\\psf\Home\Documents\K10\racecor-native\prodrive-windows"
   )
   foreach ($c in $candidates) {
     if (Test-Path (Join-Path $c "src\RaceCorProDrive\RaceCorProDrive.csproj")) {
@@ -144,18 +144,18 @@ if (-not $SkipBuild) {
   Write-Host "Build OK in $($sw.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 }
 
-# ----Register racecor-prodrive:// URL protocol for OAuth callback-------
+# ----Register racecor-native:// URL protocol for OAuth callback-------
 # The Inno Setup installer does this for end users; the dev loop needs
 # it too or the OAuth round-trip dies after the browser handoff with
 # "no app handles this protocol".
 $exeForReg = Join-Path $publishDir "RaceCorProDrive.exe"
 if (Test-Path $exeForReg) {
-  New-Item -Path "HKCU:\Software\Classes\racecor-prodrive" -Force | Out-Null
-  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-prodrive" -Name "(default)" -Value "URL:RaceCor Pro Drive Protocol"
-  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-prodrive" -Name "URL Protocol" -Value ""
-  New-Item -Path "HKCU:\Software\Classes\racecor-prodrive\shell\open\command" -Force | Out-Null
-  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-prodrive\shell\open\command" -Name "(default)" -Value "`"$exeForReg`" `"%1`""
-  Write-Host "Registered racecor-prodrive:// -> $exeForReg" -ForegroundColor Cyan
+  New-Item -Path "HKCU:\Software\Classes\racecor-native" -Force | Out-Null
+  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-native" -Name "(default)" -Value "URL:RaceCor Pro Drive Protocol"
+  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-native" -Name "URL Protocol" -Value ""
+  New-Item -Path "HKCU:\Software\Classes\racecor-native\shell\open\command" -Force | Out-Null
+  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-native\shell\open\command" -Name "(default)" -Value "`"$exeForReg`" `"%1`""
+  Write-Host "Registered racecor-native:// -> $exeForReg" -ForegroundColor Cyan
 }
 
 # ----Tail the boot log in a side window so we see startup live----------
