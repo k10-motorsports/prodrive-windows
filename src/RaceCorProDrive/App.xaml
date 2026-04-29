@@ -8,7 +8,6 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <ds:DesignSystem />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Theme: Dark (v1 default) -->

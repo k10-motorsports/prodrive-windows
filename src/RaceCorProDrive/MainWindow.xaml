@@ -1,41 +1,9 @@
 <Window
     x:Class="RaceCorProDrive.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:RaceCorProDrive"
-    Title="RaceCor Pro Drive">
-
-    <Grid Background="{ThemeResource ApplicationBackgroundThemeBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Grid x:Name="AppTitleBar" Height="40" Background="Transparent" VerticalAlignment="Top">
-            <TextBlock x:Name="AppTitle" Text="RaceCor Pro Drive" Margin="12,8,0,0" VerticalAlignment="Top"
-                       Foreground="{ThemeResource ApplicationForegroundThemeBrush}" FontSize="14" FontWeight="SemiBold" />
-            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" Orientation="Horizontal" Spacing="8">
-                <TextBlock x:Name="UserDisplay" Text="User" Foreground="{ThemeResource ApplicationForegroundThemeBrush}" VerticalAlignment="Center" FontSize="12" />
-                <Button x:Name="SignOutButton" Content="Sign Out" Click="OnSignOut" />
-            </StackPanel>
-        </Grid>
-
-        <NavigationView
-            x:Name="NavView"
-            Grid.Row="1"
-            PaneDisplayMode="Left"
-            IsBackButtonVisible="Collapsed"
-            IsPaneOpen="True"
-            Loaded="OnNavViewLoaded">
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="Dashboard" x:Name="NavDashboard" Tag="dashboard" />
-                <NavigationViewItem Content="Library" x:Name="NavLibrary" Tag="library">
-                    <NavigationViewItem.Icon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE786;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.MenuItems>
-            <Frame x:Name="ContentFrame" />
-        </NavigationView>
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="#FF0A0A14">
+        <TextBlock Text="HELLO" Foreground="White" FontSize="48"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Grid>
 </Window>

@@ -53,7 +53,11 @@ namespace RaceCorProDrive
         {
             try
             {
-                File.AppendAllText(Path.Combine(AppSettings.LogsDir, "boot.log"),
+                var dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "RaceCorProDrive", "Logs");
+                Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, "boot.log"),
                     $"[{DateTime.Now:O}] PID={Environment.ProcessId} {msg}{Environment.NewLine}");
             }
             catch { }

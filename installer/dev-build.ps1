@@ -83,8 +83,6 @@ Write-Host "Arch: $msbuildPlatform / $rid" -ForegroundColor Cyan
 # Network-share filesystems are 5-10x slower for thousands-of-small-files
 # I/O. Redirect MSBuild's obj/ and publish/ to a local NTFS path; only
 # source reads come from the share.
-$objDir     = Join-Path $BuildRoot "obj\"
-$binDir     = Join-Path $BuildRoot "bin\"
 $publishDir = Join-Path $BuildRoot "publish\$rid"
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 
@@ -135,8 +133,6 @@ if (-not $SkipBuild) {
     /p:PublishSingleFile=false `
     /p:PublishReadyToRun=false `
     /p:PublishDir=$publishDir `
-    /p:BaseIntermediateOutputPath=$objDir `
-    /p:OutputPath=$binDir `
     /p:UseXamlCompilerExecutable=false `
     /v:minimal `
     /nologo
