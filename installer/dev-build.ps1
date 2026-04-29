@@ -144,6 +144,20 @@ if (-not $SkipBuild) {
   Write-Host "Build OK in $($sw.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 }
 
+# ----Register racecor-prodrive:// URL protocol for OAuth callback-------
+# The Inno Setup installer does this for end users; the dev loop needs
+# it too or the OAuth round-trip dies after the browser handoff with
+# "no app handles this protocol".
+$exeForReg = Join-Path $publishDir "RaceCorProDrive.exe"
+if (Test-Path $exeForReg) {
+  New-Item -Path "HKCU:\Software\Classes\racecor-prodrive" -Force | Out-Null
+  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-prodrive" -Name "(default)" -Value "URL:RaceCor Pro Drive Protocol"
+  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-prodrive" -Name "URL Protocol" -Value ""
+  New-Item -Path "HKCU:\Software\Classes\racecor-prodrive\shell\open\command" -Force | Out-Null
+  Set-ItemProperty -Path "HKCU:\Software\Classes\racecor-prodrive\shell\open\command" -Name "(default)" -Value "`"$exeForReg`" `"%1`""
+  Write-Host "Registered racecor-prodrive:// -> $exeForReg" -ForegroundColor Cyan
+}
+
 # ----Tail the boot log in a side window so we see startup live----------
 $logsDir = Join-Path $env:LOCALAPPDATA "RaceCorProDrive\Logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null

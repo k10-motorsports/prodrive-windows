@@ -17,14 +17,34 @@ namespace RaceCorProDrive
             SetTitleBar(AppTitleBar);
         }
 
+        // Fires when the pre-auth frame mounts. If unauth → load LoginPage there.
+        // If already authed → flip to NavView (which will then trigger OnNavViewLoaded).
+        private void OnAuthFrameLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_authService.IsAuthenticated)
+            {
+                ShowAuthedShell();
+            }
+            else
+            {
+                AuthFrame.Navigate(typeof(LoginPage));
+            }
+        }
+
+        // Called from LoginPage once auth completes (TODO: wire LoginPage to call this).
+        public void OnSignInComplete()
+        {
+            ShowAuthedShell();
+        }
+
+        private void ShowAuthedShell()
+        {
+            AuthFrame.Visibility = Visibility.Collapsed;
+            NavView.Visibility = Visibility.Visible;
+        }
+
         private void OnNavViewLoaded(object sender, RoutedEventArgs e)
         {
-            if (!_authService.IsAuthenticated)
-            {
-                ContentFrame.Navigate(typeof(LoginPage));
-                return;
-            }
-
             UpdateUserDisplay();
             NavView.SelectedItem = NavDashboard;
             ContentFrame.Navigate(typeof(DashboardPage));
@@ -62,7 +82,9 @@ namespace RaceCorProDrive
         private void OnSignOut(object sender, RoutedEventArgs e)
         {
             _authService.SignOut();
-            ContentFrame.Navigate(typeof(LoginPage));
+            NavView.Visibility = Visibility.Collapsed;
+            AuthFrame.Visibility = Visibility.Visible;
+            AuthFrame.Navigate(typeof(LoginPage));
             NavView.SelectionChanged -= OnNavViewSelectionChanged;
         }
 

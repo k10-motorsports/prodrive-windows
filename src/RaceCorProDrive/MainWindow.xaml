@@ -25,7 +25,9 @@
             </StackPanel>
         </Grid>
 
+        <!-- Authed shell: nav + page frame. Visibility flipped by code-behind. -->
         <NavigationView x:Name="NavView" Grid.Row="1"
+                        Visibility="Collapsed"
                         PaneDisplayMode="Left"
                         IsBackButtonVisible="Collapsed"
                         IsPaneOpen="True"
@@ -50,5 +52,8 @@
 
             <Frame x:Name="ContentFrame" />
         </NavigationView>
+
+        <!-- Pre-auth: LoginPage rendered full-window so its own centering works. -->
+        <Frame x:Name="AuthFrame" Grid.Row="1" Loaded="OnAuthFrameLoaded" />
     </Grid>
 </Window>
