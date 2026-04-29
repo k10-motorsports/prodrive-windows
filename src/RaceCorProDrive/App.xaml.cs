@@ -46,7 +46,7 @@ namespace RaceCorProDrive
                 BootTrace("MainWindow created, calling Activate");
                 _mainWindow.Activate();
                 BootTrace("Activate returned");
-                _ = TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
+                _ = RaceCorProDrive.Auth.TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
                 BootTrace("TokenStore fetch kicked off");
 
                 // Process any URI captured during initial launch (rare; usually
