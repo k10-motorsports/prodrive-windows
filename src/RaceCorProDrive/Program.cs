@@ -92,12 +92,48 @@ namespace RaceCorProDrive
 
         private static void CaptureProtocolUri(AppActivationArguments? args)
         {
-            if (args?.Kind == ExtendedActivationKind.Protocol &&
+            if (args == null) return;
+
+            // Modern path: package-style protocol activation. We can register
+            // for this on installer side; until then we only see it for some
+            // launch flows.
+            if (args.Kind == ExtendedActivationKind.Protocol &&
                 args.Data is Windows.ApplicationModel.Activation.IProtocolActivatedEventArgs protoArgs)
             {
                 PendingActivationUri = protoArgs.Uri.ToString();
-                BootLog($"captured activation URI: {PendingActivationUri}");
+                BootLog($"captured activation URI (protocol): {PendingActivationUri}");
+                return;
             }
+
+            // Legacy registry path: HKCU\Software\Classes\racecor-native\shell\
+            // open\command with "%1" — Windows passes the URL as an ordinary
+            // command-line arg, so the activation kind is Launch.
+            if (args.Kind == ExtendedActivationKind.Launch &&
+                args.Data is Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs launchArgs)
+            {
+                var arg = launchArgs.Arguments;
+                BootLog($"launch activation args: '{arg}'");
+                PendingActivationUri = ExtractProtocolUri(arg);
+                if (PendingActivationUri != null)
+                    BootLog($"captured activation URI (launch): {PendingActivationUri}");
+                return;
+            }
+        }
+
+        // Pulls the racecor-native:// URL out of a command-line argument
+        // string, regardless of quoting. Args may look like:
+        //   racecor-native://auth?code=...
+        //   "racecor-native://auth?code=..."
+        //   <some prelude> racecor-native://auth?code=...
+        private static string? ExtractProtocolUri(string? cmdline)
+        {
+            if (string.IsNullOrWhiteSpace(cmdline)) return null;
+            const string scheme = "racecor-native://";
+            var idx = cmdline.IndexOf(scheme, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return null;
+            var tail = cmdline.Substring(idx).Trim();
+            if (tail.EndsWith("\"")) tail = tail.Substring(0, tail.Length - 1);
+            return tail;
         }
 
         public static string? ConsumePendingActivationUri()
