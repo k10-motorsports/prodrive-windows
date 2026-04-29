@@ -24,9 +24,11 @@ $ErrorActionPreference = "Stop"
 # ----Locate the source on the Parallels share--------------------------
 if (-not $Source) {
   $candidates = @(
-    "Z:\Documents\K10\racecor-native\prodrive-windows",
-    "\\Mac\Home\Documents\K10\racecor-native\prodrive-windows",
-    "\\psf\Home\Documents\K10\racecor-native\prodrive-windows"
+    (Get-Location).Path,                  # if you cd'd into the project dir
+    (Split-Path $PSScriptRoot -Parent),   # script lives in installer/, project is parent
+    "Z:\Documents\K10\racecor-prodrive\prodrive-windows",
+    "\\Mac\Home\Documents\K10\racecor-prodrive\prodrive-windows",
+    "\\psf\Home\Documents\K10\racecor-prodrive\prodrive-windows"
   )
   foreach ($c in $candidates) {
     if (Test-Path (Join-Path $c "src\RaceCorProDrive\RaceCorProDrive.csproj")) {
