@@ -132,6 +132,16 @@ Root: HKCU; Subkey: "Software\Classes\ProDrive.Bundle"; ValueType: string; Value
 Root: HKCU; Subkey: "Software\Classes\ProDrive.Bundle\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",1"
 Root: HKCU; Subkey: "Software\Classes\ProDrive.Bundle\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
+; ── racecor-prodrive:// custom URL protocol ─────────────────────
+; OAuth redirect comes back to racecor-prodrive://auth?code=… so
+; Windows needs to know which app to hand the URI to. Without this,
+; sign-in completes server-side but the browser hits "no app handles
+; this protocol" and the user is stuck.
+Root: HKCU; Subkey: "Software\Classes\racecor-prodrive"; ValueType: string; ValueName: ""; ValueData: "URL:RaceCor Pro Drive Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\racecor-prodrive"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\racecor-prodrive\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",1"
+Root: HKCU; Subkey: "Software\Classes\racecor-prodrive\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
