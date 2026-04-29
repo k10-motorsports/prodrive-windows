@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.UI;
 using RaceCorProDrive.Api;
+using RaceCorProDrive.Support;
 
 namespace RaceCorProDrive.DesignSystem.Components
 {
@@ -25,6 +26,22 @@ namespace RaceCorProDrive.DesignSystem.Components
         {
             get => (Dashboard?)GetValue(DashboardProperty);
             set => SetValue(DashboardProperty, value);
+        }
+
+        /// <summary>
+        /// Active dashboard context — drives the count column's label
+        /// flip ("RACES" → "PRACTICES" when context==Practice).
+        /// Defaults to <see cref="DashboardContext.Race"/> for embeds
+        /// that don't know about contexts.
+        /// </summary>
+        public static readonly DependencyProperty ContextProperty = DependencyProperty.Register(
+            nameof(Context), typeof(DashboardContext), typeof(DataStrip),
+            new PropertyMetadata(DashboardContext.Race, (d, _) => ((DataStrip)d).Rebuild()));
+
+        public DashboardContext Context
+        {
+            get => (DashboardContext)GetValue(ContextProperty);
+            set => SetValue(ContextProperty, value);
         }
 
         private readonly StackPanel _row;
@@ -60,7 +77,11 @@ namespace RaceCorProDrive.DesignSystem.Components
         {
             _row.Children.Clear();
             var dash = Dashboard;
-            AppendStat("RACES", dash?.Stats.TotalRaces.ToString() ?? "0");
+            // Code stays as `TotalRaces` (wire/DB field name); only
+            // the on-screen label moves with context — same convention
+            // codified in `prodrive-agents/skills/server-design-system`.
+            var countLabel = Context == DashboardContext.Practice ? "PRACTICES" : "RACES";
+            AppendStat(countLabel, dash?.Stats.TotalRaces.ToString() ?? "0");
             AppendDivider();
             AppendStat("LAPS",  dash?.Stats.TotalLaps.ToString() ?? "0");
 

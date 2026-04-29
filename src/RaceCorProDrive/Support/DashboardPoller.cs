@@ -99,7 +99,12 @@ namespace RaceCorProDrive.Support
             OnUi(() => IsPolling = true);
             try
             {
-                var snapshot = await ApiClient.Shared.DashboardAsync();
+                // Read user's current filter prefs. Poller fires
+                // outside the view tree so we read LocalSettings
+                // directly. The dashboard page triggers an immediate
+                // re-tick via PollNowAsync() on filter change.
+                var (ctx, lic) = DashboardFilterPrefs.Current();
+                var snapshot = await ApiClient.Shared.DashboardAsync(ctx, lic);
                 if (snapshot != null)
                 {
                     OnUi(() =>

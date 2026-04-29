@@ -50,7 +50,55 @@ namespace RaceCorProDrive.Pages
             DashboardPoller.Shared.Start();
             await ThemeStore.Shared.RefreshAsync();
             UpdateForCurrentSnapshot();
+            // Sync the filter buttons' Content to whatever's persisted
+            // — first paint shouldn't blink-default to "Races" if the
+            // user previously chose Practice.
+            UpdateFilterButtonLabels();
         }
+
+        // ── Dashboard filter buttons (Race/Practice + License) ─────
+        // The XAML side has DropDownButton + MenuFlyoutItem rows. Each
+        // click sets the corresponding pref via DashboardFilterPrefs,
+        // updates the button labels, and restarts the poller so the
+        // dashboard refetches immediately rather than waiting up to
+        // 60s for the next tick.
+
+        private void UpdateFilterButtonLabels()
+        {
+            var (ctx, lic) = DashboardFilterPrefs.Current();
+            ContextFilterButton.Content = ctx.DisplayName();
+            LicenseFilterButton.Content = lic.DisplayName();
+        }
+
+        private void ApplyContext(DashboardContext ctx)
+        {
+            DashboardFilterPrefs.SetContext(ctx);
+            UpdateFilterButtonLabels();
+            // Sync the strip's count label immediately so the label
+            // doesn't lag behind the dropdown selection by a network
+            // round-trip. The next poller tick refreshes the
+            // numbers; the label is just presentation.
+            StatStrip.Context = ctx;
+            // Restart poller so it ticks now with the new prefs.
+            DashboardPoller.Shared.Start();
+        }
+
+        private void ApplyLicense(DashboardLicense lic)
+        {
+            DashboardFilterPrefs.SetLicense(lic);
+            UpdateFilterButtonLabels();
+            DashboardPoller.Shared.Start();
+        }
+
+        private void OnContextRaceClick(object sender, RoutedEventArgs e)     => ApplyContext(DashboardContext.Race);
+        private void OnContextPracticeClick(object sender, RoutedEventArgs e) => ApplyContext(DashboardContext.Practice);
+
+        private void OnLicenseAllClick(object sender, RoutedEventArgs e)      => ApplyLicense(DashboardLicense.All);
+        private void OnLicenseRoadClick(object sender, RoutedEventArgs e)     => ApplyLicense(DashboardLicense.Road);
+        private void OnLicenseOvalClick(object sender, RoutedEventArgs e)     => ApplyLicense(DashboardLicense.Oval);
+        private void OnLicenseDirtRoadClick(object sender, RoutedEventArgs e) => ApplyLicense(DashboardLicense.DirtRoad);
+        private void OnLicenseDirtOvalClick(object sender, RoutedEventArgs e) => ApplyLicense(DashboardLicense.DirtOval);
+        private void OnLicenseFormulaClick(object sender, RoutedEventArgs e)  => ApplyLicense(DashboardLicense.Formula);
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
@@ -75,6 +123,10 @@ namespace RaceCorProDrive.Pages
         {
             var dash = DashboardPoller.Shared.Latest;
             StatStrip.Dashboard = dash;
+            // Keep the strip's count label in sync with the active
+            // context — flips between "RACES" and "PRACTICES" based
+            // on whatever the user picked in the filter dropdown.
+            StatStrip.Context = DashboardFilterPrefs.Current().Context;
             Sidebar.Dashboard = dash;
 
             LoadingRing.IsActive = dash == null;

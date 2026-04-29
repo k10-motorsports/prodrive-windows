@@ -1,6 +1,6 @@
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using RaceCorProDrive.Pages;
 using RaceCorProDrive.Auth;
 
@@ -17,15 +17,34 @@ namespace RaceCorProDrive
             SetTitleBar(AppTitleBar);
         }
 
+        // Fires when the pre-auth frame mounts. If unauth → load LoginPage there.
+        // If already authed → flip to NavView (which will then trigger OnNavViewLoaded).
+        private void OnAuthFrameLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_authService.IsAuthenticated)
+            {
+                ShowAuthedShell();
+            }
+            else
+            {
+                AuthFrame.Navigate(typeof(LoginPage));
+            }
+        }
+
+        // Called from LoginPage once auth completes (TODO: wire LoginPage to call this).
+        public void OnSignInComplete()
+        {
+            ShowAuthedShell();
+        }
+
+        private void ShowAuthedShell()
+        {
+            AuthFrame.Visibility = Visibility.Collapsed;
+            NavView.Visibility = Visibility.Visible;
+        }
+
         private void OnNavViewLoaded(object sender, RoutedEventArgs e)
         {
-            // Check if user is authenticated
-            if (!_authService.IsAuthenticated)
-            {
-                ContentFrame.Navigate(typeof(LoginPage));
-                return;
-            }
-
             UpdateUserDisplay();
             NavView.SelectedItem = NavDashboard;
             ContentFrame.Navigate(typeof(DashboardPage));
@@ -34,9 +53,7 @@ namespace RaceCorProDrive
 
         private void OnNavViewSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
         {
-            if (args.SelectedItem is not NavigationViewItem item)
-                return;
-
+            if (args.SelectedItem is not NavigationViewItem item) return;
             var tag = item.Tag?.ToString() ?? "dashboard";
             NavigateToPage(tag);
         }
@@ -46,6 +63,7 @@ namespace RaceCorProDrive
             Type pageType = tag switch
             {
                 "dashboard" => typeof(DashboardPage),
+                "library" => typeof(LibraryPage),
                 "races" => typeof(SessionsPage),
                 "moments" => typeof(PlaceholderPage),
                 "tracks" => typeof(PlaceholderPage),
@@ -55,17 +73,18 @@ namespace RaceCorProDrive
                 "safety" => typeof(PlaceholderPage),
                 "composure" => typeof(PlaceholderPage),
                 "debrief" => typeof(PlaceholderPage),
-                "settings" => typeof(PlaceholderPage),
+                "settings" => typeof(SettingsPage),
                 _ => typeof(DashboardPage)
             };
-
             ContentFrame.Navigate(pageType, tag);
         }
 
         private void OnSignOut(object sender, RoutedEventArgs e)
         {
             _authService.SignOut();
-            ContentFrame.Navigate(typeof(LoginPage));
+            NavView.Visibility = Visibility.Collapsed;
+            AuthFrame.Visibility = Visibility.Visible;
+            AuthFrame.Navigate(typeof(LoginPage));
             NavView.SelectionChanged -= OnNavViewSelectionChanged;
         }
 

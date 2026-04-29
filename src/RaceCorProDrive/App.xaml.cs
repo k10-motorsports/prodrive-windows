@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using RaceCorProDrive.Auth;
 using RaceCorProDrive.DesignSystem;
 using RaceCorProDrive.Support;
 
@@ -11,6 +13,11 @@ namespace RaceCorProDrive
     {
         // Dev override via AppSettings key "racecor.dev.baseUrl"; production default otherwise.
         private const string DefaultBaseUrl = "https://prodrive.racecor.io";
+
+        // Set when the first Window is activated, so we can route OAuth
+        // callbacks (which arrive on a worker thread) back to the UI dispatcher.
+        private static MainWindow? _mainWindow;
+        private static AuthService? _authService;
 
         public App()
         {
@@ -34,12 +41,23 @@ namespace RaceCorProDrive
             try
             {
                 BootTrace("new MainWindow()");
-                var window = new MainWindow();
+                _mainWindow = new MainWindow();
+                _authService = new AuthService();
                 BootTrace("MainWindow created, calling Activate");
-                window.Activate();
+                _mainWindow.Activate();
                 BootTrace("Activate returned");
-                _ = TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
+                _ = RaceCorProDrive.DesignSystem.TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
                 BootTrace("TokenStore fetch kicked off");
+
+                // Process any URI captured during initial launch (rare; usually
+                // OAuth comes back via redirected activation while we're already
+                // running — see HandleProtocolActivation).
+                var pending = Program.ConsumePendingActivationUri();
+                if (!string.IsNullOrEmpty(pending))
+                {
+                    BootTrace($"OnLaunched: processing initial activation URI {pending}");
+                    _ = ProcessAuthCallbackAsync(pending);
+                }
             }
             catch (Exception ex)
             {
@@ -49,11 +67,54 @@ namespace RaceCorProDrive
             }
         }
 
+        /// <summary>
+        /// Called by Program.cs when a *redirected* activation arrives —
+        /// browser handed us racecor-native://auth?... while we were already
+        /// running. Marshals back to the UI thread because activation
+        /// callbacks fire on a worker thread.
+        /// </summary>
+        public static void HandleProtocolActivation()
+        {
+            var uri = Program.ConsumePendingActivationUri();
+            if (string.IsNullOrEmpty(uri)) return;
+            BootTrace($"HandleProtocolActivation: {uri}");
+
+            var dispatcher = _mainWindow?.DispatcherQueue;
+            if (dispatcher == null)
+            {
+                BootTrace("HandleProtocolActivation: no dispatcher yet, dropping");
+                return;
+            }
+            dispatcher.TryEnqueue(() => _ = ProcessAuthCallbackAsync(uri));
+        }
+
+        private static async System.Threading.Tasks.Task ProcessAuthCallbackAsync(string uri)
+        {
+            BootTrace($"ProcessAuthCallback: {uri}");
+            try
+            {
+                if (_authService == null) _authService = new AuthService();
+                await _authService.OnAuthCallbackAsync(uri);
+                BootTrace("ProcessAuthCallback: auth succeeded");
+
+                _mainWindow?.OnSignInComplete();
+            }
+            catch (Exception ex)
+            {
+                LogCrash("ProcessAuthCallback", ex);
+                BootTrace($"ProcessAuthCallback THREW: {ex.Message}");
+            }
+        }
+
         private static void BootTrace(string msg)
         {
             try
             {
-                File.AppendAllText(Path.Combine(AppSettings.LogsDir, "boot.log"),
+                var dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "RaceCorProDrive", "Logs");
+                Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, "boot.log"),
                     $"[{DateTime.Now:O}] PID={Environment.ProcessId} {msg}{Environment.NewLine}");
             }
             catch { }

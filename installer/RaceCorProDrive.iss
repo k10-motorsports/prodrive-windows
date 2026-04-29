@@ -116,6 +116,32 @@ Source: "{#PLUGIN_UNPACKED}\*"; DestDir: "{app}\Plugin"; Flags: ignoreversion re
 Name: "{userprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
+[Registry]
+; ── .rcpdv (RaceCor Pro Drive Video) bundle format ──────────────
+; Custom file association so .rcpdv files double-click into the
+; editor while Windows still treats them as video for indexing,
+; the file picker's "Videos" filter, and Photos integration. The
+; bytes underneath are valid MP4 — any video tool that's pointed at
+; the file directly can still play it. Spec: agents/skills/race-bundle-format/
+;
+; Per-user install (HKCU) matches PrivilegesRequired=lowest above.
+Root: HKCU; Subkey: "Software\Classes\.rcpdv"; ValueType: string; ValueName: ""; ValueData: "ProDrive.Bundle"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.rcpdv"; ValueType: string; ValueName: "PerceivedType"; ValueData: "video"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.rcpdv"; ValueType: string; ValueName: "Content Type"; ValueData: "video/mp4"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\ProDrive.Bundle"; ValueType: string; ValueName: ""; ValueData: "RaceCor Pro Drive Bundle"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\ProDrive.Bundle\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",1"
+Root: HKCU; Subkey: "Software\Classes\ProDrive.Bundle\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
+; ── racecor-native:// custom URL protocol ─────────────────────
+; OAuth redirect comes back to racecor-native://auth?code=… so
+; Windows needs to know which app to hand the URI to. Without this,
+; sign-in completes server-side but the browser hits "no app handles
+; this protocol" and the user is stuck.
+Root: HKCU; Subkey: "Software\Classes\racecor-native"; ValueType: string; ValueName: ""; ValueData: "URL:RaceCor Pro Drive Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\racecor-native"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\racecor-native\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",1"
+Root: HKCU; Subkey: "Software\Classes\racecor-native\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 

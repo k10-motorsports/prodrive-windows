@@ -165,15 +165,26 @@ namespace RaceCorProDrive.Api
         /// registry (same shape DashboardPage.RefreshRaceNowAsync
         /// already uses to send TZ to /calc/race-now).
         /// </summary>
-        public Task<Dashboard?> DashboardAsync()
+        public Task<Dashboard?> DashboardAsync(
+            Support.DashboardContext context = Support.DashboardContext.Race,
+            Support.DashboardLicense license = Support.DashboardLicense.All)
         {
             var tz = TimeZoneInfo.Local.HasIanaId
                 ? TimeZoneInfo.Local.Id
                 : TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id, out var iana)
                     ? iana
                     : "UTC";
-            var encoded = Uri.EscapeDataString(tz);
-            return GetAsync<Dashboard>($"{BaseUrl}/api/v1/dashboard?tz={encoded}");
+            var encodedTz = Uri.EscapeDataString(tz);
+
+            // Context + license carry the user's dashboard view
+            // prefs. Defaults match the server's defaults
+            // (race + all) so a caller that omits them gets
+            // backward-compatible behavior.
+            var ctxWire = context.ToWireValue();
+            var licWire = license.ToWireValue();
+            return GetAsync<Dashboard>(
+                $"{BaseUrl}/api/v1/dashboard?tz={encodedTz}&context={ctxWire}&license={licWire}"
+            );
         }
 
         /// <summary>GET /api/v1/sessions — paginated race list.</summary>
