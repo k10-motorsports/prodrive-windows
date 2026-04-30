@@ -374,9 +374,20 @@ namespace RaceCorProDrive.Auth
 
     public class TokenResponse
     {
+        // OAuth 2.0 spec returns snake_case (access_token, refresh_token,
+        // token_type, expires_in). The shared JsonSerializerOptions on
+        // ApiClient uses CamelCase which would silently leave these null,
+        // which is exactly the "no token detected" failure mode.
+        [System.Text.Json.Serialization.JsonPropertyName("access_token")]
         public string? AccessToken { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("refresh_token")]
         public string? RefreshToken { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("token_type")]
         public string? TokenType { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("expires_in")]
         public int ExpiresIn { get; set; } = 3600;
     }
 
