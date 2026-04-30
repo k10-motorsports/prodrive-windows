@@ -35,33 +35,10 @@
             </StackPanel>
         </Grid>
 
-        <!-- Authed shell: nav + page frame. Visibility flipped by code-behind. -->
-        <NavigationView x:Name="NavView" Grid.Row="1"
-                        Visibility="Collapsed"
-                        PaneDisplayMode="Left"
-                        IsBackButtonVisible="Collapsed"
-                        IsPaneOpen="True"
-                        Loaded="OnNavViewLoaded">
-            <NavigationView.MenuItems>
-                <NavigationViewItem Icon="Home" Content="Dashboard" x:Name="NavDashboard" Tag="dashboard" />
-                <NavigationViewItem Icon="List" Content="Races" x:Name="NavRaces" Tag="races" />
-                <NavigationViewItem Icon="Library" Content="Library" x:Name="NavLibrary" Tag="library" />
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Icon="ShowResults" Content="Moments" x:Name="NavMoments" Tag="moments" />
-                <NavigationViewItem Icon="MapPin" Content="Tracks" x:Name="NavTracks" Tag="tracks" />
-                <NavigationViewItem Icon="Bookmarks" Content="Cars" x:Name="NavCars" Tag="cars" />
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Icon="World" Content="DNA" x:Name="NavDNA" Tag="dna" />
-                <NavigationViewItem Icon="Clock" Content="When" x:Name="NavWhen" Tag="when" />
-                <NavigationViewItem Icon="ProtectedDocument" Content="Safety" x:Name="NavSafety" Tag="safety" />
-                <NavigationViewItem Icon="Favorite" Content="Composure" x:Name="NavComposure" Tag="composure" />
-                <NavigationViewItemSeparator />
-                <NavigationViewItem Icon="Document" Content="Debrief" x:Name="NavDebrief" Tag="debrief" />
-                <NavigationViewItem Icon="Setting" Content="Settings" x:Name="NavSettings" Tag="settings" />
-            </NavigationView.MenuItems>
-
-            <Frame x:Name="ContentFrame" />
-        </NavigationView>
+        <!-- Authed shell: just a Frame holding the active page (DashboardPage,
+             SessionsPage, LibraryPage, etc.). The pages own their own primary
+             nav (LeftRail) — matches the Mac/iOS layout. -->
+        <Frame x:Name="ContentFrame" Grid.Row="1" Visibility="Collapsed" Loaded="OnContentFrameLoaded" />
 
         <!-- Pre-auth: LoginPage rendered full-window so its own centering works. -->
         <Frame x:Name="AuthFrame" Grid.Row="1" Loaded="OnAuthFrameLoaded" />

@@ -17,8 +17,9 @@ namespace RaceCorProDrive
             SetTitleBar(AppTitleBar);
         }
 
-        // Fires when the pre-auth frame mounts. If unauth → load LoginPage there.
-        // If already authed → flip to NavView (which will then trigger OnNavViewLoaded).
+        // Pre-auth: LoginPage. Code-behind calls OnSignInComplete() once
+        // sign-in succeeds; that flips this frame off and the authed
+        // shell on.
         private void OnAuthFrameLoaded(object sender, RoutedEventArgs e)
         {
             if (_authService.IsAuthenticated)
@@ -31,7 +32,17 @@ namespace RaceCorProDrive
             }
         }
 
-        // Called from LoginPage once auth completes (TODO: wire LoginPage to call this).
+        // Authed shell: navigate to DashboardPage by default. Pages own
+        // their own primary nav (LeftRail), matching the Mac/iOS layout.
+        private void OnContentFrameLoaded(object sender, RoutedEventArgs e)
+        {
+            if (ContentFrame.Content == null)
+            {
+                ContentFrame.Navigate(typeof(DashboardPage));
+            }
+            UpdateUserDisplay();
+        }
+
         public void OnSignInComplete()
         {
             ShowAuthedShell();
@@ -40,25 +51,13 @@ namespace RaceCorProDrive
         private void ShowAuthedShell()
         {
             AuthFrame.Visibility = Visibility.Collapsed;
-            NavView.Visibility = Visibility.Visible;
+            ContentFrame.Visibility = Visibility.Visible;
+            // ContentFrameLoaded handles the initial page navigation.
         }
 
-        private void OnNavViewLoaded(object sender, RoutedEventArgs e)
-        {
-            UpdateUserDisplay();
-            NavView.SelectedItem = NavDashboard;
-            ContentFrame.Navigate(typeof(DashboardPage));
-            NavView.SelectionChanged += OnNavViewSelectionChanged;
-        }
-
-        private void OnNavViewSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
-        {
-            if (args.SelectedItem is not NavigationViewItem item) return;
-            var tag = item.Tag?.ToString() ?? "dashboard";
-            NavigateToPage(tag);
-        }
-
-        private void NavigateToPage(string tag)
+        // Public so LeftRail / future top-level navigators can drive page
+        // changes from anywhere in the visual tree.
+        public void NavigateToPage(string tag)
         {
             Type pageType = tag switch
             {
@@ -82,10 +81,9 @@ namespace RaceCorProDrive
         private void OnSignOut(object sender, RoutedEventArgs e)
         {
             _authService.SignOut();
-            NavView.Visibility = Visibility.Collapsed;
+            ContentFrame.Visibility = Visibility.Collapsed;
             AuthFrame.Visibility = Visibility.Visible;
             AuthFrame.Navigate(typeof(LoginPage));
-            NavView.SelectionChanged -= OnNavViewSelectionChanged;
         }
 
         private void UpdateUserDisplay()
