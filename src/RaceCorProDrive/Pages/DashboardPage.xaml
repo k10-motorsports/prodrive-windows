@@ -25,17 +25,15 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <components:LeftRail x:Name="LeftRail"
-                                 Grid.Column="0"
-                                 SelectedKey="dashboard" />
-
-            <!-- Main column -->
-            <Grid Grid.Column="1">
+            <!-- Main column. (Mac/iOS use a custom LeftRail here; on
+                 Windows the NavigationView pane in MainWindow already
+                 provides primary navigation, so we drop the rail to
+                 avoid two stacked nav columns.) -->
+            <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="44" />
                     <RowDefinition Height="Auto" />
@@ -117,7 +115,7 @@
             </Grid>
 
             <components:SidebarTabs x:Name="Sidebar"
-                                    Grid.Column="2" />
+                                    Grid.Column="1" />
         </Grid>
 
         <ProgressRing x:Name="LoadingRing"
