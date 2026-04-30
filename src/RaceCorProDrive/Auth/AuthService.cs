@@ -137,9 +137,12 @@ namespace RaceCorProDrive.Auth
             SaveAuthState(new AuthState { CodeVerifier = codeVerifier, State = state });
 
             var port = GetAvailableLoopbackPort();
-            var redirectUri = $"http://127.0.0.1:{port}/auth";
+            // Use "localhost" not 127.0.0.1 — OAuth servers' loopback
+            // allowlists are usually string-matched against "localhost"
+            // and reject the IP literal even though they're equivalent.
+            var redirectUri = $"http://localhost:{port}/auth";
             var listener = new HttpListener();
-            listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            listener.Prefixes.Add($"http://localhost:{port}/");
             listener.Start();
 
             var authUrl = $"{BaseUrl}/api/plugin-auth/authorize?" +
