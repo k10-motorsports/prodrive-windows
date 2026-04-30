@@ -115,23 +115,23 @@ namespace RaceCorProDrive.Support
 
         public static (DashboardContext Context, DashboardLicense License) Current()
         {
-            var settings = ApplicationData.Current.LocalSettings.Values;
-            var ctxRaw = settings[ContextKey] as string;
-            var licRaw = settings[LicenseKey] as string;
+            // ApplicationData.Current is packaged-only; use the file-based
+            // AppSettings store (lives under %LOCALAPPDATA%\RaceCorProDrive\)
+            // that already works for unpackaged WinUI 3.
             return (
-                DashboardContextExtensions.FromWireValue(ctxRaw),
-                DashboardLicenseExtensions.FromWireValue(licRaw)
+                DashboardContextExtensions.FromWireValue(AppSettings.Get(ContextKey)),
+                DashboardLicenseExtensions.FromWireValue(AppSettings.Get(LicenseKey))
             );
         }
 
         public static void SetContext(DashboardContext ctx)
         {
-            ApplicationData.Current.LocalSettings.Values[ContextKey] = ctx.ToWireValue();
+            AppSettings.Set(ContextKey, ctx.ToWireValue());
         }
 
         public static void SetLicense(DashboardLicense lic)
         {
-            ApplicationData.Current.LocalSettings.Values[LicenseKey] = lic.ToWireValue();
+            AppSettings.Set(LicenseKey, lic.ToWireValue());
         }
     }
 }
