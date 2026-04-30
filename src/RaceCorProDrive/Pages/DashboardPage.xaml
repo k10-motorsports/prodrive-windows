@@ -12,6 +12,8 @@
          placeholders so build still passes. Add real layout back once
          the bad control is identified. -->
     <Grid Background="#FF0A0A14">
+        <design:ThemedBackgroundControl />
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
