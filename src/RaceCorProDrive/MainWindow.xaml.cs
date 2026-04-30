@@ -47,11 +47,7 @@ namespace RaceCorProDrive
         {
             UpdateUserDisplay();
             NavView.SelectedItem = NavDashboard;
-            // TEMP: Land on PlaceholderPage instead of DashboardPage to
-            // isolate the post-sign-in stowed-exception crash. Dashboard
-            // page or one of its controls (LeftRail/Sidebar/etc.) is
-            // throwing in native XAML code. Swap back once root cause found.
-            ContentFrame.Navigate(typeof(PlaceholderPage), "dashboard");
+            ContentFrame.Navigate(typeof(DashboardPage));
             NavView.SelectionChanged += OnNavViewSelectionChanged;
         }
 

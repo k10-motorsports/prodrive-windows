@@ -7,123 +7,38 @@
     Loaded="OnLoaded"
     Unloaded="OnUnloaded">
 
-    <!--
-        Layout mirror of the SwiftUI DashboardView:
-            ┌── ThemedBackgroundControl ──────────────────────────────┐
-            │  ┌── LeftRail ──┐  ┌── Main column ──────────────────┐  ┌──── Sidebar ────┐
-            │  │ icons        │  │ tabs                            │  │ Tracks / Cars   │
-            │  │              │  │ Performance content (scroll)    │  │ glass panel     │
-            │  │              │  │ DataStrip (footer)              │  │                 │
-            │  └──────────────┘  └─────────────────────────────────┘  └─────────────────┘
-            └─────────────────────────────────────────────────────────┘
-        Background extends edge-to-edge so theme livery photos read across the rail
-        and sidebar — same composition as the macOS build.
-    -->
+    <!-- DIAGNOSTIC: stripped to find which custom control crashes the page.
+         All x:Name elements the codebehind references are kept as no-op
+         placeholders so build still passes. Add real layout back once
+         the bad control is identified. -->
+    <Grid Background="#FF0A0A14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-    <Grid>
-        <design:ThemedBackgroundControl />
+        <!-- Header row holds elements codebehind references by x:Name -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Padding="20,8">
+            <components:DashboardTabs x:Name="TabsBar" SelectionChanged="OnTabChanged" />
+            <DropDownButton x:Name="ContextFilterButton" Content="Context" />
+            <DropDownButton x:Name="LicenseFilterButton" Content="License" />
+        </StackPanel>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <ScrollViewer Grid.Row="1" Padding="20,0">
+            <StackPanel x:Name="MainContent" Orientation="Vertical" Spacing="14">
+                <TextBlock Text="Dashboard scaffold loaded — content will fill in once we find the crashing control."
+                           Foreground="White" FontSize="14"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </ScrollViewer>
 
-            <components:LeftRail x:Name="LeftRail"
-                                 Grid.Column="0"
-                                 SelectedKey="dashboard" />
-
-            <!-- Main column -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="44" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <Border Grid.Row="0"
-                        Padding="20,0"
-                        VerticalAlignment="Center">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <components:DashboardTabs x:Name="TabsBar"
-                                                  Grid.Column="0"
-                                                  SelectionChanged="OnTabChanged" />
-
-                        <!-- Race / Practice context + License filters.
-                             DropDownButton drops a MenuFlyout. Both
-                             buttons read the current selection in
-                             their Content; clicking selects sets the
-                             pref + triggers an immediate refresh. -->
-                        <StackPanel Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    VerticalAlignment="Center">
-                            <DropDownButton x:Name="ContextFilterButton"
-                                            Padding="10,4">
-                                <DropDownButton.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuFlyoutItem Text="Races"
-                                                        Click="OnContextRaceClick" />
-                                        <MenuFlyoutItem Text="Practices"
-                                                        Click="OnContextPracticeClick" />
-                                    </MenuFlyout>
-                                </DropDownButton.Flyout>
-                            </DropDownButton>
-
-                            <DropDownButton x:Name="LicenseFilterButton"
-                                            Padding="10,4">
-                                <DropDownButton.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuFlyoutItem Text="All Licenses"
-                                                        Click="OnLicenseAllClick" />
-                                        <MenuFlyoutItem Text="Sports Car"
-                                                        Click="OnLicenseRoadClick" />
-                                        <MenuFlyoutItem Text="Oval"
-                                                        Click="OnLicenseOvalClick" />
-                                        <MenuFlyoutItem Text="Dirt Road"
-                                                        Click="OnLicenseDirtRoadClick" />
-                                        <MenuFlyoutItem Text="Dirt Oval"
-                                                        Click="OnLicenseDirtOvalClick" />
-                                        <MenuFlyoutItem Text="Formula"
-                                                        Click="OnLicenseFormulaClick" />
-                                    </MenuFlyout>
-                                </DropDownButton.Flyout>
-                            </DropDownButton>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Hairline under the tabs -->
-                <Border Grid.Row="1"
-                        Height="1"
-                        Background="{StaticResource BorderSubtleBrush}" />
-
-                <ScrollViewer Grid.Row="2"
-                              Padding="20,14,20,30">
-                    <StackPanel x:Name="MainContent"
-                                Orientation="Vertical"
-                                Spacing="14" />
-                </ScrollViewer>
-
-                <components:DataStrip x:Name="StatStrip"
-                                      Grid.Row="3" />
-            </Grid>
-
-            <components:SidebarTabs x:Name="Sidebar"
-                                    Grid.Column="2" />
-        </Grid>
+        <!-- DataStrip pinned to bottom; comment out if it's the culprit -->
+        <components:DataStrip x:Name="StatStrip" Grid.Row="2" />
 
         <ProgressRing x:Name="LoadingRing"
                       IsActive="False"
                       Width="48" Height="48"
-                      Foreground="{StaticResource BrandRedBrush}"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center" />
     </Grid>

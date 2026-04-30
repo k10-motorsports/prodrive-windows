@@ -127,7 +127,7 @@ namespace RaceCorProDrive.Pages
             // context — flips between "RACES" and "PRACTICES" based
             // on whatever the user picked in the filter dropdown.
             StatStrip.Context = DashboardFilterPrefs.Current().Context;
-            Sidebar.Dashboard = dash;
+            // Sidebar.Dashboard = dash;  // DIAG: Sidebar removed in stripped XAML
 
             LoadingRing.IsActive = dash == null;
             MainContent.Children.Clear();
