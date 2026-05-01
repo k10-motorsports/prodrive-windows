@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -53,6 +54,9 @@ namespace RaceCorProDrive.DesignSystem
                 return;
             }
 
+            // PNG preferred — pixel-accurate to whatever the uploader
+            // seeded (matches what the web/mac shows). Same priority
+            // the SwiftUI BrandLogo uses.
             if (!string.IsNullOrEmpty(Lookup.LogoPng))
             {
                 try
@@ -78,7 +82,42 @@ namespace RaceCorProDrive.DesignSystem
                 }
                 catch
                 {
-                    // Bad base64 / corrupted PNG → fall through to initial.
+                    // Bad base64 / corrupted PNG → fall through to SVG.
+                }
+            }
+
+            // SVG fallback — many brands ship logoSvg but no logoPng
+            // (BMW M, F4, Dallara, Porsche, etc). Without this branch
+            // the Cars sidebar collapses every brand to a letter badge.
+            if (!string.IsNullOrEmpty(Lookup.LogoSvg))
+            {
+                try
+                {
+                    var svgBytes = Encoding.UTF8.GetBytes(Lookup.LogoSvg);
+                    var svgSource = new SvgImageSource();
+                    using var stream = new InMemoryRandomAccessStream();
+                    using (var writer = new DataWriter(stream))
+                    {
+                        writer.WriteBytes(svgBytes);
+                        await writer.StoreAsync();
+                        writer.DetachStream();
+                    }
+                    stream.Seek(0);
+                    var status = await svgSource.SetSourceAsync(stream);
+                    if (status == SvgImageSourceLoadStatus.Success)
+                    {
+                        Content = new Image
+                        {
+                            Source = svgSource,
+                            Stretch = Stretch.Uniform,
+                            Height = GlyphHeight,
+                        };
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Malformed SVG → fall through to initial.
                 }
             }
 

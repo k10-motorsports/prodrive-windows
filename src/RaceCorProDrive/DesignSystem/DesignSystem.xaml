@@ -66,4 +66,28 @@
     <SolidColorBrush x:Key="K10RedBrush"         Color="{StaticResource BrandRed}" />
     <SolidColorBrush x:Key="BackgroundBrush"     Color="{StaticResource BgBase}" />
     <SolidColorBrush x:Key="SurfaceBaseBrush"    Color="{StaticResource BgElevated}" />
+
+    <!--
+        Dark themed DropDownButton — matches the dashboard's glass
+        aesthetic instead of WinUI's default light gray button. Used
+        for the Race / Practice + License filter dropdowns at the
+        top of the dashboard. Subtle border, transparent fill, hover
+        bumps to a faint white wash.
+
+        Per-state hover/pressed colors live in `Page.Resources` on
+        the host page (see DashboardPage.xaml) — `Resources` is not
+        a DependencyProperty so it can't be set through a Style
+        Setter; scoping the overrides at the page level keeps them
+        from leaking onto system buttons elsewhere.
+    -->
+    <Style x:Key="AppDropDownButtonStyle" TargetType="DropDownButton">
+        <Setter Property="Background" Value="#1AFFFFFF" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="10,5,10,5" />
+    </Style>
 </ResourceDictionary>

@@ -38,11 +38,26 @@ namespace RaceCorProDrive.DesignSystem.Components
 
         public Panel()
         {
+            // Stretch the inner Border to fill the templated
+            // ContentPresenter slot. ContentControl defaults its
+            // HorizontalContentAlignment to Left, which sizes _border
+            // to its child's intrinsic width — fine for a card that's
+            // measured in isolation, broken when the panel sits in a
+            // Grid column that's supposed to fill 1/3 of the row.
+            // Without this, the 3-up calendar/schedule/DNA cards
+            // collapse to their content width and stop short of the
+            // column edge, misaligning with the full-width panels
+            // above them.
+            HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            VerticalContentAlignment = VerticalAlignment.Stretch;
+
             _border = new Border
             {
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(16),
                 BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
             };
             // ContentControl forwards Content to Border via Template;
             // we sidestep that with an explicit nested ContentPresenter

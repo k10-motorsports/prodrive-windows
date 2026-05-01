@@ -48,14 +48,20 @@ namespace RaceCorProDrive.DesignSystem.Components
 
         public DataStrip()
         {
-            Height = 56;
+            // 48pt strip with 8pt top + 8pt bottom internal padding.
+            // Old version was 56pt with the row centered, which made
+            // labels feel like they were touching the top hairline
+            // and stranded a fat gap below the values. Explicit
+            // top/bottom padding gives both edges symmetric breathing
+            // room and shrinks the overall footer.
+            Height = 48;
             VerticalAlignment = VerticalAlignment.Bottom;
 
             _row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
-                Padding = new Thickness(0, 0, 16, 0),
+                Padding = new Thickness(0, 8, 16, 8),
             };
 
             var hairline = new Microsoft.UI.Xaml.Shapes.Rectangle
@@ -142,18 +148,39 @@ namespace RaceCorProDrive.DesignSystem.Components
                 rowPanel.Children.Add(MakeBadge(badgeText, LicenseTint(cls)));
             }
 
+            // Inline sparkline matching the SwiftUI build — line color
+            // tracks the trend (up=green / down=red / flat=dim), tiny
+            // dot anchors the latest point.
+            if (rating.Sparkline != null && rating.Sparkline.Count >= 2)
+            {
+                var values = new System.Collections.Generic.List<int>(rating.Sparkline.Count);
+                foreach (var p in rating.Sparkline) values.Add(p.Value);
+                rowPanel.Children.Add(new Sparkline
+                {
+                    Values = values,
+                    Trend = rating.Trend,
+                    Width = 110,
+                    Height = 22,
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+            }
+
             col.Children.Add(rowPanel);
             _row.Children.Add(col);
         }
 
         private void AppendDivider()
         {
+            // 28pt inside the 32pt content area (after 8+8 strip
+            // padding) gives 2pt breathing room top + bottom so the
+            // divider doesn't kiss the hairline above or the strip
+            // floor below.
             _row.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
             {
                 Width = 1,
-                Height = 32,
+                Height = 28,
                 Fill = (Brush)Application.Current.Resources["BorderSubtleBrush"],
-                Margin = new Thickness(0, 12, 0, 12),
+                VerticalAlignment = VerticalAlignment.Center,
             });
         }
 
@@ -177,17 +204,26 @@ namespace RaceCorProDrive.DesignSystem.Components
 
         private static Border MakeBadge(string text, Color tint)
         {
+            // Tighter padding + explicit center alignment on both axes.
+            // Earlier version showed the digits riding the top edge of
+            // the chip because TextBlock's intrinsic line-box leaves
+            // descender room below — explicitly centering inside the
+            // border resolves it.
             return new Border
             {
                 Background = new SolidColorBrush(tint),
                 CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(6, 2, 6, 2),
+                Padding = new Thickness(6, 1, 6, 1),
+                VerticalAlignment = VerticalAlignment.Center,
                 Child = new TextBlock
                 {
                     Text = text,
                     FontSize = 10,
                     FontWeight = Microsoft.UI.Text.FontWeights.Bold,
                     Foreground = new SolidColorBrush(Color.FromArgb(0xD1, 0, 0, 0)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextLineBounds = Microsoft.UI.Xaml.TextLineBounds.Tight,
                 },
             };
         }

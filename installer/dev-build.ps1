@@ -9,14 +9,28 @@
 # user-facing release.
 #
 # Usage (from PowerShell in the Win11 VM):
-#   .\dev-build.ps1                     # auto-detects shared folder + arch
-#   .\dev-build.ps1 -Source "Z:\path"   # override if Parallels mounts elsewhere
-#   .\dev-build.ps1 -SkipBuild          # just relaunch the last build
+#   .\dev-build.ps1                       # auto-detects shared folder + arch
+#   .\dev-build.ps1 -Source "Z:\path"     # override if Parallels mounts elsewhere
+#   .\dev-build.ps1 -SkipBuild            # just relaunch the last build
+#   .\dev-build.ps1 -IncludeOverlay       # stage prodrive-overlay next to the
+#                                         # host so the bottom-left HUD launcher
+#                                         # button appears + works in dev runs.
+#                                         # If the overlay was already built on
+#                                         # the Mac side (dist/win-unpacked/
+#                                         # exists) we just copy it - Electron
+#                                         # builds cross-compile via Mac and
+#                                         # land much faster than rebuilding in
+#                                         # the VM. Pair with -RebuildOverlay to
+#                                         # force a fresh in-VM build.
+#   .\dev-build.ps1 -IncludeOverlay -RebuildOverlay
 
 param(
   [string]$Source = "",
   [string]$BuildRoot = "C:\racecor-build",
-  [switch]$SkipBuild
+  [string]$OverlayRepo = "",
+  [switch]$SkipBuild,
+  [switch]$IncludeOverlay,
+  [switch]$RebuildOverlay
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,6 +102,22 @@ Write-Host "Arch: $msbuildPlatform / $rid" -ForegroundColor Cyan
 $publishDir = Join-Path $BuildRoot "publish\$rid"
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 
+# ----Kill any prior host or overlay process----------------------------
+# A leftover RaceCorProDrive.exe (or RaceCorProDriveOverlay.exe) from a
+# previous dev cycle holds locks on the DLLs we're about to overwrite,
+# which makes 'dotnet publish' fail with MSB3021/MSB3027. Close them
+# first; harmless when nothing's running.
+foreach ($name in @('RaceCorProDrive', 'RaceCorProDriveOverlay')) {
+  $existing = Get-Process -Name $name -ErrorAction SilentlyContinue
+  if ($existing) {
+    Write-Host "Stopping running '$name' (PID $($existing.Id -join ', '))..." -ForegroundColor Yellow
+    $existing | Stop-Process -Force -ErrorAction SilentlyContinue
+    # Brief settle so the OS releases file handles before MSBuild
+    # tries to write the publish dir.
+    Start-Sleep -Milliseconds 500
+  }
+}
+
 if (-not $SkipBuild) {
   # Side-load System.Security.Permissions 6.0.0 next to the in-process
   # XAML compiler task DLL — without it, MSBuild can't load the task
@@ -144,6 +174,109 @@ if (-not $SkipBuild) {
     exit 1
   }
   Write-Host "Build OK in $($sw.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
+}
+
+# ----Optional: build the Electron overlay and stage it----------------
+# When -IncludeOverlay is passed, run electron-builder in the sibling
+# prodrive-overlay repo and copy its win-unpacked output into
+# <publishDir>\Overlay\. The host's OverlayLauncher resolves
+# `{BaseDir}\Overlay\RaceCorOverlay.exe` first; staging it here is what
+# makes the bottom-left HUD launcher button visible + functional in
+# dev runs (without it, the FAB hides itself because the binary isn't
+# bundled).
+if ($IncludeOverlay) {
+  if (-not $OverlayRepo) {
+    $candidates = @(
+      (Join-Path (Split-Path $Source -Parent) 'prodrive-overlay'),
+      "Z:\Documents\K10\racecor-prodrive\prodrive-overlay",
+      "\\Mac\Home\Documents\K10\racecor-prodrive\prodrive-overlay",
+      "\\psf\Home\Documents\K10\racecor-prodrive\prodrive-overlay"
+    )
+    foreach ($c in $candidates) {
+      if (Test-Path (Join-Path $c 'package.json')) { $OverlayRepo = $c; break }
+    }
+  }
+  if (-not $OverlayRepo -or -not (Test-Path (Join-Path $OverlayRepo 'package.json'))) {
+    Write-Host "-IncludeOverlay set but prodrive-overlay not found." -ForegroundColor Red
+    Write-Host "Pass -OverlayRepo `"<path>`" with the location of the overlay repo." -ForegroundColor Red
+    exit 1
+  }
+
+  # Prefer a pre-built overlay if one's sitting on disk - typically
+  # the user has run 'npm run build:win' on the Mac side, which
+  # cross-compiles Windows binaries in seconds vs. the 5-10 min it
+  # takes to rebuild inside the Parallels VM.
+  #
+  # electron-builder lays out per-arch unpacked trees:
+  #   dist/win-unpacked/        -> x64 (the "primary" arch electron-builder uses)
+  #   dist/win-arm64-unpacked/  -> arm64
+  # Pick the directory matching the host arch we're publishing for -
+  # otherwise on ARM64 we stage an x64 binary the host can't reliably
+  # spawn (or worse, silently rebuilds in the VM for many minutes).
+  $unpackedSubdir = if ($rid -eq 'win-arm64') { 'dist\win-arm64-unpacked' } else { 'dist\win-unpacked' }
+  $sourceUnpacked = Join-Path $OverlayRepo $unpackedSubdir
+  $haveBuilt = Test-Path (Join-Path $sourceUnpacked 'RaceCorProDriveOverlay.exe')
+  Write-Host "Overlay arch: $rid  ->  $sourceUnpacked" -ForegroundColor DarkGray
+  Write-Host "  RaceCorProDriveOverlay.exe present: $haveBuilt" -ForegroundColor DarkGray
+
+  if ($RebuildOverlay -or -not $haveBuilt) {
+    if ($RebuildOverlay) {
+      Write-Host "`n-RebuildOverlay set - building overlay in VM..." -ForegroundColor Yellow
+    } else {
+      Write-Host "`nNo pre-built overlay at $sourceUnpacked - building in VM..." -ForegroundColor Yellow
+      Write-Host "  (faster: run 'npm run build:win' in prodrive-overlay on the Mac side)" -ForegroundColor DarkGray
+    }
+
+    # Copy overlay sources to a local NTFS path for the same reason
+    # we do it for the host: electron-builder + npm install are
+    # I/O-heavy and grind on a Parallels share.
+    $overlayLocal = Join-Path $BuildRoot 'overlay-src'
+    if (Test-Path $overlayLocal) { Remove-Item -Recurse -Force $overlayLocal }
+    New-Item -ItemType Directory -Force -Path $overlayLocal | Out-Null
+    robocopy $OverlayRepo $overlayLocal /MIR /XD node_modules dist .git tests test-results /NFL /NDL /NJH /NJS /NP /NS | Out-Null
+    if ($LASTEXITCODE -ge 8) { Write-Host "robocopy failed copying overlay sources" -ForegroundColor Red; exit 1 }
+
+    Push-Location $overlayLocal
+    try {
+      $owSw = [System.Diagnostics.Stopwatch]::StartNew()
+      & npm install --no-audit --no-fund --loglevel=error
+      if ($LASTEXITCODE -ne 0) { Write-Host "npm install failed" -ForegroundColor Red; exit 1 }
+      $arch = if ($rid -eq 'win-arm64') { '--arm64' } else { '--x64' }
+      & npx electron-builder --win $arch --dir
+      if ($LASTEXITCODE -ne 0) { Write-Host "electron-builder failed" -ForegroundColor Red; exit 1 }
+      $owSw.Stop()
+      Write-Host "Overlay build OK in $($owSw.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
+    } finally {
+      Pop-Location
+    }
+
+    $sourceUnpacked = Join-Path $overlayLocal 'dist\win-unpacked'
+  } else {
+    Write-Host "`nUsing pre-built overlay from $sourceUnpacked" -ForegroundColor Green
+  }
+
+  if (-not (Test-Path $sourceUnpacked)) {
+    Write-Host "Expected overlay at $sourceUnpacked, not found." -ForegroundColor Red
+    exit 1
+  }
+  $overlayDest = Join-Path $publishDir 'Overlay'
+  if (Test-Path $overlayDest) { Remove-Item -Recurse -Force $overlayDest }
+  New-Item -ItemType Directory -Force -Path $overlayDest | Out-Null
+  Write-Host "Staging overlay -> $overlayDest" -ForegroundColor Cyan
+  $stageSw = [System.Diagnostics.Stopwatch]::StartNew()
+  # Drop /NFL /NDL so we get directory-level progress while the
+  # share-to-NTFS robocopy churns; previously this looked frozen
+  # for minutes at a time on ARM64 Parallels VMs.
+  robocopy $sourceUnpacked $overlayDest /MIR /NJH /NJS /NP /NS
+  if ($LASTEXITCODE -ge 8) { Write-Host "robocopy failed staging overlay" -ForegroundColor Red; exit 1 }
+  $stageSw.Stop()
+  $stagedExe = Join-Path $overlayDest 'RaceCorProDriveOverlay.exe'
+  if (Test-Path $stagedExe) {
+    Write-Host "Staged in $($stageSw.Elapsed.TotalSeconds.ToString('F1'))s - RaceCorProDriveOverlay.exe present" -ForegroundColor Green
+  } else {
+    Write-Host "Staging finished but RaceCorProDriveOverlay.exe is missing at $stagedExe" -ForegroundColor Red
+    Write-Host "Check that 'npm run build:win' actually produced it on the Mac." -ForegroundColor Red
+  }
 }
 
 # ----Register racecor-native:// URL protocol for OAuth callback-------

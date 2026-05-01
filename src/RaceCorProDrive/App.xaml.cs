@@ -1,10 +1,12 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.Auth;
 using RaceCorProDrive.DesignSystem;
+using RaceCorProDrive.Services;
 using RaceCorProDrive.Support;
 
 namespace RaceCorProDrive
@@ -18,6 +20,23 @@ namespace RaceCorProDrive
         // callbacks (which arrive on a worker thread) back to the UI dispatcher.
         private static MainWindow? _mainWindow;
         private static AuthService? _authService;
+
+        /// <summary>
+        /// AppSettings key for the iRacing auto-launch toggle. Default
+        /// behavior is opt-in but ON — sim starts → overlay launches +
+        /// dashboard hides; sim stops → overlay closes + dashboard
+        /// re-appears. The upcoming Settings page will surface this
+        /// as a user-facing toggle (settings are migrating from the
+        /// web app into the Windows host).
+        /// </summary>
+        public const string SettingKey_AutoLaunchOverlay = "racecor.iracing.autoLaunchOverlay";
+
+        /// <summary>
+        /// Active MainWindow accessor for pages that need to call back
+        /// up to the shell (e.g. LeftRail's profile flyout invoking
+        /// SignOut). Null before the first <see cref="OnLaunched"/>.
+        /// </summary>
+        public static MainWindow? MainWindow => _mainWindow;
 
         public App()
         {
@@ -48,6 +67,16 @@ namespace RaceCorProDrive
                 BootTrace("Activate returned");
                 _ = RaceCorProDrive.DesignSystem.TokenStore.Instance.LoadOrFetchAsync(GetBaseUrl());
                 BootTrace("TokenStore fetch kicked off");
+
+                // Start the iRacing detector + bind it to the overlay
+                // launcher. When the sim transitions running → stopped
+                // we auto-launch / auto-close the overlay (and hide /
+                // restore the dashboard window symmetrically with the
+                // manual FAB flow). Toggle gated on the per-user
+                // setting so a future Settings page can disable it.
+                IRacingDetector.Shared.PropertyChanged += OnIRacingStateChanged;
+                IRacingDetector.Shared.Start();
+                BootTrace("IRacingDetector started");
 
                 // Process any URI captured during initial launch (rare; usually
                 // OAuth comes back via redirected activation while we're already
@@ -116,6 +145,62 @@ namespace RaceCorProDrive
             {
                 LogCrash("ProcessAuthCallback", ex);
                 BootTrace($"ProcessAuthCallback THREW: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Mirrors the manual FAB flow: when iRacing starts, launch
+        /// the overlay + hide the dashboard window; when it stops,
+        /// close the overlay (the existing OverlayLauncher PropChanged
+        /// handler in DashboardPage re-shows the dashboard window).
+        /// Gated on the per-user opt-in setting (default ON).
+        /// </summary>
+        private static void OnIRacingStateChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(IRacingDetector.IsRunning)) return;
+
+            // Re-read the setting on every state change so toggles in
+            // the Settings page take effect immediately, no app
+            // restart required.
+            if (!AppSettings.GetBool(SettingKey_AutoLaunchOverlay, defaultValue: true)) return;
+
+            var dispatcher = _mainWindow?.DispatcherQueue;
+            if (dispatcher == null) return;
+
+            if (IRacingDetector.Shared.IsRunning)
+            {
+                // Sim started - launch overlay + minimize dashboard.
+                // Minimize (not Hide) because AppWindow.Hide on the
+                // chromeless host's only top-level Window can collapse
+                // the dispatcher loop and shut the process down. The
+                // DashboardPage OnOverlayStateChanged handler restores
+                // the window when the overlay exits.
+                dispatcher.TryEnqueue(() =>
+                {
+                    if (OverlayLauncher.Shared.IsRunning) return;
+                    var proc = OverlayLauncher.Shared.Launch();
+                    if (proc != null)
+                    {
+                        var presenter = _mainWindow?.AppWindow?.Presenter
+                            as Microsoft.UI.Windowing.OverlappedPresenter;
+                        presenter?.Minimize();
+                    }
+                });
+            }
+            else
+            {
+                // Sim stopped — close overlay. OverlayLauncher fires
+                // its own PropertyChanged on Process.Exited, which the
+                // DashboardPage handler then uses to re-show the
+                // dashboard window. Symmetric with the manual close
+                // path so we don't need duplicate restore logic here.
+                dispatcher.TryEnqueue(() =>
+                {
+                    if (OverlayLauncher.Shared.IsRunning)
+                    {
+                        OverlayLauncher.Shared.Stop();
+                    }
+                });
             }
         }
 

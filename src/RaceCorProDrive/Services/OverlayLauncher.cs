@@ -156,19 +156,49 @@ namespace RaceCorProDrive.Services
         // ── Helpers ──
 
         /// <summary>
-        /// Resolves the bundled HUD binary. The combined installer
-        /// drops both products into one folder:
-        ///   %LOCALAPPDATA%\Programs\RaceCor\
-        ///     ├── RaceCorProDrive.exe   (this host, AppContext.BaseDirectory)
-        ///     └── Overlay\RaceCorOverlay.exe
+        /// Resolves the bundled HUD binary in this priority order:
+        ///   1. Production install: <c>{BaseDir}\Overlay\RaceCorOverlay.exe</c>
+        ///      (Inno Setup drops the unpacked electron tree there).
+        ///   2. Dev fallback: walk up parent dirs looking for a sibling
+        ///      <c>prodrive-overlay\dist\win-unpacked\RaceCorOverlay.exe</c>
+        ///      so the FAB works for <c>dotnet run</c> from the source
+        ///      tree as long as the overlay's been built once via
+        ///      <c>npm run build:win</c> (or <c>dev-build.ps1 -IncludeOverlay</c>).
+        ///   3. Env var override <c>RACECOR_OVERLAY_PATH</c> for one-off
+        ///      dev setups where the overlay lives in a non-standard spot.
         /// </summary>
         private static string? ResolveBinary()
         {
-            var candidate = Path.Combine(
-                AppContext.BaseDirectory,
-                "Overlay",
-                "RaceCorOverlay.exe");
-            return File.Exists(candidate) ? candidate : null;
+            // electron-builder names the Windows exe per `productName`
+            // in the overlay's electron-builder.yml.
+            const string OverlayExe = "RaceCorProDriveOverlay.exe";
+
+            // 1. Production install layout — Overlay\ next to the host.
+            var primary = Path.Combine(AppContext.BaseDirectory, "Overlay", OverlayExe);
+            if (File.Exists(primary)) return primary;
+
+            // 3. Env var override (checked early so it always wins
+            //    over the auto-discovery walk if the user set it).
+            var envOverride = Environment.GetEnvironmentVariable("RACECOR_OVERLAY_PATH");
+            if (!string.IsNullOrEmpty(envOverride) && File.Exists(envOverride))
+            {
+                return envOverride;
+            }
+
+            // 2. Dev fallback — walk up from BaseDirectory looking for
+            //    a sibling prodrive-overlay/dist/win-unpacked/ tree.
+            //    Capped at 8 levels so we don't grovel up to the drive
+            //    root on production installs that lack the overlay.
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int depth = 0; depth < 8 && dir != null; depth++)
+            {
+                var candidate = Path.Combine(
+                    dir.FullName, "prodrive-overlay", "dist", "win-unpacked", OverlayExe);
+                if (File.Exists(candidate)) return candidate;
+                dir = dir.Parent;
+            }
+
+            return null;
         }
 
         private void Raise([CallerMemberName] string? name = null)
