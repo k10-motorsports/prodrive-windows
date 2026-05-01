@@ -4,43 +4,41 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:RaceCorProDrive">
 
-    <Grid Background="{ThemeResource ApplicationBackgroundThemeBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <!--
+        RequestedTheme=Dark forces all WinUI default brushes
+        (DropDownButton chevrons, MenuFlyout backgrounds, ProgressRing,
+        etc.) to resolve in dark mode regardless of the user's system
+        theme. Without this, the dashboard's filter dropdowns render
+        black chevrons on dark glass on light-system-theme machines.
 
-        <!-- Title bar.
-             Three columns: (1) brand title left, (2) actions right, and
-             (3) ~140px reserved for the system caption buttons (min/max/
-             close) which Win overlays into whatever element we hand to
-             SetTitleBar(...). Without this reserve column the user
-             actions render *under* the close button. -->
-        <Grid x:Name="AppTitleBar" Height="40" Background="Transparent" VerticalAlignment="Top">
+        Layout uses z-order, NOT rows: the active page Frame fills the
+        whole window so its livery photo + content extend to y=0.
+        AppTitleBar floats on top as a transparent 32pt drag region
+        that hosts the system caption buttons (min/max/close) — the
+        only "title bar" Windows lets us keep, and even those float
+        directly over the page content with no visible chrome.
+    -->
+    <Grid Background="{ThemeResource ApplicationBackgroundThemeBrush}"
+          RequestedTheme="Dark">
+
+        <!-- Authed shell: a Frame holding the active page. Pages own
+             their own primary nav (LeftRail) and just need to keep
+             their top-right ~140×32pt corner free of interactive
+             controls so the system caption buttons aren't obscured. -->
+        <Frame x:Name="ContentFrame" Visibility="Collapsed" Loaded="OnContentFrameLoaded" />
+
+        <!-- Pre-auth: LoginPage rendered full-window. -->
+        <Frame x:Name="AuthFrame" Loaded="OnAuthFrameLoaded" />
+
+        <!-- Invisible drag region floating on top of the page's top
+             32pt. SetTitleBar() in the code-behind hands this to the
+             system as the "title bar" — clicks on blank areas drag
+             the window, clicks on interactive children pass through. -->
+        <Grid x:Name="AppTitleBar" Height="32" Background="Transparent" VerticalAlignment="Top">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="140" />
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" x:Name="AppTitle" Text="RaceCor Pro Drive"
-                       Margin="12,0,0,0" VerticalAlignment="Center"
-                       Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
-                       FontSize="14" FontWeight="SemiBold" />
-            <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                        Orientation="Horizontal" Spacing="8">
-                <TextBlock x:Name="UserDisplay" Text="User"
-                           Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
-                           VerticalAlignment="Center" FontSize="12" />
-                <Button x:Name="SignOutButton" Content="Sign Out" Click="OnSignOut" />
-            </StackPanel>
         </Grid>
-
-        <!-- Authed shell: just a Frame holding the active page (DashboardPage,
-             SessionsPage, LibraryPage, etc.). The pages own their own primary
-             nav (LeftRail) — matches the Mac/iOS layout. -->
-        <Frame x:Name="ContentFrame" Grid.Row="1" Visibility="Collapsed" Loaded="OnContentFrameLoaded" />
-
-        <!-- Pre-auth: LoginPage rendered full-window so its own centering works. -->
-        <Frame x:Name="AuthFrame" Grid.Row="1" Loaded="OnAuthFrameLoaded" />
     </Grid>
 </Window>

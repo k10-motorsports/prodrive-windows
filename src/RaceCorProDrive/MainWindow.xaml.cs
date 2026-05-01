@@ -40,7 +40,25 @@ namespace RaceCorProDrive
             {
                 ContentFrame.Navigate(typeof(DashboardPage));
             }
-            UpdateUserDisplay();
+        }
+
+        /// <summary>
+        /// Display name for the signed-in user. Used by the LeftRail's
+        /// profile flyout to show "You're signed in as &lt;name&gt;".
+        /// </summary>
+        public string CurrentUserDisplayName =>
+            _authService.CurrentUser?.DiscordDisplayName ?? "User";
+
+        /// <summary>
+        /// Sign out and return to the login screen. Invoked from the
+        /// LeftRail's profile flyout's "Sign Out" item.
+        /// </summary>
+        public void SignOut()
+        {
+            _authService.SignOut();
+            ContentFrame.Visibility = Visibility.Collapsed;
+            AuthFrame.Visibility = Visibility.Visible;
+            AuthFrame.Navigate(typeof(LoginPage));
         }
 
         public void OnSignInComplete()
@@ -78,20 +96,5 @@ namespace RaceCorProDrive
             ContentFrame.Navigate(pageType, tag);
         }
 
-        private void OnSignOut(object sender, RoutedEventArgs e)
-        {
-            _authService.SignOut();
-            ContentFrame.Visibility = Visibility.Collapsed;
-            AuthFrame.Visibility = Visibility.Visible;
-            AuthFrame.Navigate(typeof(LoginPage));
-        }
-
-        private void UpdateUserDisplay()
-        {
-            if (_authService.CurrentUser != null)
-            {
-                UserDisplay.Text = _authService.CurrentUser.DiscordDisplayName ?? "User";
-            }
-        }
     }
 }

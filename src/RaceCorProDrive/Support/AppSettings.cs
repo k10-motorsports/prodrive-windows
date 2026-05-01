@@ -101,6 +101,22 @@ namespace RaceCorProDrive.Support
             value = ""; return false;
         }
 
+        /// <summary>
+        /// Boolean setting accessor with a default for first-run /
+        /// missing keys. Round-trips as "true"/"false" strings via
+        /// the existing string store. Used for settings that the
+        /// upcoming Settings page will eventually expose to the user.
+        /// </summary>
+        public static bool GetBool(string key, bool defaultValue)
+        {
+            var raw = Get(key);
+            if (string.IsNullOrEmpty(raw)) return defaultValue;
+            return bool.TryParse(raw, out var b) ? b : defaultValue;
+        }
+
+        public static void SetBool(string key, bool value)
+            => Set(key, value ? "true" : "false");
+
         private static void Save()
         {
             lock (_gate)

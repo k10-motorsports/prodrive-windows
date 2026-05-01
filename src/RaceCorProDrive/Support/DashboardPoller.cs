@@ -36,7 +36,7 @@ namespace RaceCorProDrive.Support
         public Dashboard? Latest
         {
             get => _latest;
-            private set { _latest = value; Raise(); Raise(nameof(Sessions)); }
+            private set { _latest = value; Raise(); Raise(nameof(Sessions)); Raise(nameof(PreviousRaces)); }
         }
 
         private DateTime? _lastUpdated;
@@ -60,6 +60,14 @@ namespace RaceCorProDrive.Support
         /// </summary>
         public IReadOnlyList<RecentSession> Sessions =>
             Latest?.RecentSessions ?? (IReadOnlyList<RecentSession>)Array.Empty<RecentSession>();
+
+        /// <summary>
+        /// Server-baked Previous Races cards. Mirrors the Swift
+        /// poller's <c>previousRaces</c> accessor — view-models come
+        /// fully formatted from <c>/api/v1/dashboard</c>.
+        /// </summary>
+        public IReadOnlyList<PreviousRaceCard> PreviousRaces =>
+            Latest?.PreviousRaces ?? (IReadOnlyList<PreviousRaceCard>)Array.Empty<PreviousRaceCard>();
 
         private CancellationTokenSource? _cts;
         private readonly DispatcherQueue _dispatcher = DispatcherQueue.GetForCurrentThread()

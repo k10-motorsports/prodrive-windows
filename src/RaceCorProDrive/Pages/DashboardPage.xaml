@@ -8,6 +8,24 @@
     Unloaded="OnUnloaded">
 
     <!--
+        Per-state brush overrides for the themed AppDropDownButtonStyle.
+        WinUI looks these brush keys up via {ThemeResource ...} from
+        within the Button's default ControlTemplate; declaring them as
+        Page.Resources scopes the dark-glass hover/pressed colors to
+        the dashboard's filter buttons without leaking onto every
+        system Button in the app.
+    -->
+    <Page.Resources>
+        <SolidColorBrush x:Key="ButtonBackgroundPointerOver"  Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="ButtonBackgroundPressed"      Color="#0DFFFFFF" />
+        <SolidColorBrush x:Key="ButtonBackgroundDisabled"     Color="#0AFFFFFF" />
+        <SolidColorBrush x:Key="ButtonForegroundPointerOver"  Color="{StaticResource TextPrimary}" />
+        <SolidColorBrush x:Key="ButtonForegroundPressed"      Color="{StaticResource TextPrimary}" />
+        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#3DFFFFFF" />
+        <SolidColorBrush x:Key="ButtonBorderBrushPressed"     Color="{StaticResource BrandRed}" />
+    </Page.Resources>
+
+    <!--
         Layout mirror of the SwiftUI DashboardView:
             ┌── ThemedBackgroundControl ──────────────────────────────┐
             │  ┌── LeftRail ──┐  ┌── Main column ──────────────────┐  ┌──── Sidebar ────┐
@@ -37,7 +55,17 @@
             <!-- Main column -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="44" />
+                    <!--
+                        Row 0 grew 44 → 76pt: 32pt at the top
+                        belongs to the chromeless window's drag
+                        region (system caption buttons live there)
+                        and the tabs Border sits in the bottom 44pt.
+                        Without this offset the tabs/dropdowns are
+                        siblings to AppTitleBar and the drag region
+                        eats their clicks — only the bottom edge of
+                        each control was reachable.
+                    -->
+                    <RowDefinition Height="76" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
@@ -45,7 +73,8 @@
 
                 <Border Grid.Row="0"
                         Padding="20,0"
-                        VerticalAlignment="Center">
+                        Height="44"
+                        VerticalAlignment="Bottom">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -66,7 +95,7 @@
                                     Spacing="8"
                                     VerticalAlignment="Center">
                             <DropDownButton x:Name="ContextFilterButton"
-                                            Padding="10,4">
+                                            Style="{StaticResource AppDropDownButtonStyle}">
                                 <DropDownButton.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
                                         <MenuFlyoutItem Text="Races"
@@ -78,7 +107,7 @@
                             </DropDownButton>
 
                             <DropDownButton x:Name="LicenseFilterButton"
-                                            Padding="10,4">
+                                            Style="{StaticResource AppDropDownButtonStyle}">
                                 <DropDownButton.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
                                         <MenuFlyoutItem Text="All Licenses"
@@ -106,7 +135,7 @@
                         Background="{StaticResource BorderSubtleBrush}" />
 
                 <ScrollViewer Grid.Row="2"
-                              Padding="20,14,20,30">
+                              Padding="20,14,20,12">
                     <StackPanel x:Name="MainContent"
                                 Orientation="Vertical"
                                 Spacing="14" />
@@ -126,5 +155,41 @@
                       Foreground="{StaticResource BrandRedBrush}"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center" />
+
+        <!--
+            Floating launcher for the racing overlay (HUD). Sits at
+            the bottom-left of the dashboard. Click hides this window
+            and spawns the overlay; closing the overlay re-shows the
+            dashboard. Hidden when the overlay binary isn't installed
+            (dev runs without a built HUD next to the host).
+        -->
+        <Button x:Name="OverlayLaunchButton"
+                Click="OnOverlayLaunchClick"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="16,0,0,16"
+                Width="56" Height="56"
+                CornerRadius="28"
+                Padding="0"
+                BorderThickness="1"
+                BorderBrush="#3DFFFFFF"
+                Background="{StaticResource BrandRedBrush}"
+                Foreground="White"
+                ToolTipService.ToolTip="Launch racing overlay">
+            <Button.Resources>
+                <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FF5B47" />
+                <SolidColorBrush x:Key="ButtonBackgroundPressed"     Color="#C81E1E" />
+                <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
+                <SolidColorBrush x:Key="ButtonForegroundPressed"     Color="White" />
+                <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#80FFFFFF" />
+                <SolidColorBrush x:Key="ButtonBorderBrushPressed"     Color="#80FFFFFF" />
+            </Button.Resources>
+            <!-- Game/controller glyph from Segoe Fluent Icons. -->
+            <TextBlock FontFamily="Segoe Fluent Icons"
+                       Text="&#xE7FC;"
+                       FontSize="22"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+        </Button>
     </Grid>
 </Page>

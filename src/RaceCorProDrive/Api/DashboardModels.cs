@@ -34,6 +34,7 @@ namespace RaceCorProDrive.Api
         [JsonPropertyName("lookups")]           public DashboardLookups? Lookups { get; set; }
         [JsonPropertyName("scatterBuckets")]    public List<ScatterBucket>? ScatterBuckets { get; set; }
         [JsonPropertyName("recentSessions")]    public List<RecentSession>? RecentSessions { get; set; }
+        [JsonPropertyName("previousRaces")]     public List<PreviousRaceCard>? PreviousRaces { get; set; }
 
         // ── Convenience accessors (match the Swift extensions) ──
 
@@ -351,6 +352,58 @@ namespace RaceCorProDrive.Api
         [JsonPropertyName("category")]        public string Category { get; set; } = "road";
         [JsonPropertyName("carModel")]        public string? CarModel { get; set; }
         [JsonPropertyName("incidentCount")]   public int? IncidentCount { get; set; }
+    }
+
+    /// One session bundled into a Previous Races card. Mirrors the
+    /// shape produced by `apps/web-api/src/calc/previous-races.ts`.
+    public class PreviousRaceSession
+    {
+        [JsonPropertyName("id")]              public string Id { get; set; } = "";
+        [JsonPropertyName("carModel")]        public string CarModel { get; set; } = "";
+        [JsonPropertyName("manufacturer")]    public string? Manufacturer { get; set; }
+        [JsonPropertyName("trackName")]       public string? TrackName { get; set; }
+        [JsonPropertyName("trackConfig")]     public string? TrackConfig { get; set; }
+        [JsonPropertyName("finishPosition")]  public int? FinishPosition { get; set; }
+        [JsonPropertyName("incidentCount")]   public int? IncidentCount { get; set; }
+        [JsonPropertyName("bestLapTime")]     public double? BestLapTime { get; set; }
+        [JsonPropertyName("fieldSize")]       public int? FieldSize { get; set; }
+        [JsonPropertyName("completedLaps")]   public int? CompletedLaps { get; set; }
+        [JsonPropertyName("gameName")]        public string? GameName { get; set; }
+        [JsonPropertyName("sessionType")]     public string? SessionType { get; set; }
+        [JsonPropertyName("category")]        public string Category { get; set; } = "";
+        [JsonPropertyName("createdAt")]       public string CreatedAt { get; set; } = "";
+    }
+
+    /// Server-baked presentation strings for a Previous Races card.
+    /// Native renders these verbatim — see the SwiftUI counterpart.
+    public class PreviousRaceViewModel
+    {
+        [JsonPropertyName("sessionTypeTab")]            public string SessionTypeTab { get; set; } = "races";
+        [JsonPropertyName("positionDisplay")]           public string? PositionDisplay { get; set; }
+        [JsonPropertyName("positionColorHex")]          public string? PositionColorHex { get; set; }
+        [JsonPropertyName("fieldSizeLabel")]            public string? FieldSizeLabel { get; set; }
+        [JsonPropertyName("bestLapLabel")]              public string BestLapLabel { get; set; } = "—";
+        [JsonPropertyName("practiceBestLapLabel")]      public string? PracticeBestLapLabel { get; set; }
+        [JsonPropertyName("qualifyingBestLapLabel")]    public string? QualifyingBestLapLabel { get; set; }
+        [JsonPropertyName("qualifyingPositionLabel")]   public string? QualifyingPositionLabel { get; set; }
+        [JsonPropertyName("dateLabel")]                 public string DateLabel { get; set; } = "";
+        [JsonPropertyName("sessionLabel")]              public string SessionLabel { get; set; } = "";
+        [JsonPropertyName("incidentsLabel")]            public string? IncidentsLabel { get; set; }
+        [JsonPropertyName("practiceIncidentsLabel")]    public string? PracticeIncidentsLabel { get; set; }
+        [JsonPropertyName("gameLabel")]                 public string GameLabel { get; set; } = "";
+        [JsonPropertyName("trackLabel")]                public string TrackLabel { get; set; } = "";
+    }
+
+    /// One Previous Races card — already paired with sibling practice
+    /// and qualifying sessions on the server side.
+    public class PreviousRaceCard
+    {
+        [JsonPropertyName("session")]            public PreviousRaceSession Session { get; set; } = new();
+        [JsonPropertyName("practiceSession")]    public PreviousRaceSession? PracticeSession { get; set; }
+        [JsonPropertyName("qualifyingSession")]  public PreviousRaceSession? QualifyingSession { get; set; }
+        [JsonPropertyName("viewModel")]          public PreviousRaceViewModel ViewModel { get; set; } = new();
+
+        public string Id => Session.Id;
     }
 
     /// Shared map of internal category keys → user-facing display

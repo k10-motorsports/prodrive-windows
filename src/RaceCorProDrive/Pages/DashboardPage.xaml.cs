@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.Api;
 using RaceCorProDrive.DesignSystem;
 using RaceCorProDrive.DesignSystem.Components;
+using RaceCorProDrive.Services;
 using RaceCorProDrive.Support;
 using Panel = RaceCorProDrive.DesignSystem.Components.Panel;
 
@@ -17,11 +18,10 @@ namespace RaceCorProDrive.Pages
 {
     /// <summary>
     /// Signed-in dashboard. Reads live data from
-    /// <see cref="DashboardPoller.Shared"/>; rebuilds the Performance
-    /// tab's panels (Should-You-Race, Strengths/Watch-Out, plus
-    /// stubbed visualization placeholders pending the Win2D port) on
-    /// every <see cref="INotifyPropertyChanged"/> tick. NextRace and
-    /// Previous tab content is stubbed for v1 and will follow.
+    /// <see cref="DashboardPoller.Shared"/>; rebuilds the active tab's
+    /// content on every <see cref="INotifyPropertyChanged"/> tick.
+    /// Performance, Next Race, and Previous Races tabs all render
+    /// real content mirroring the SwiftUI <c>DashboardView</c>.
     /// </summary>
     public sealed partial class DashboardPage : Page
     {
@@ -54,6 +54,26 @@ namespace RaceCorProDrive.Pages
             // — first paint shouldn't blink-default to "Races" if the
             // user previously chose Practice.
             UpdateFilterButtonLabels();
+
+            // Wire the rail's profile flyout: feed it the user's name
+            // and route Sign Out back to the MainWindow shell. The
+            // rail itself owns the menu surface; we just hand it the
+            // data + callback.
+            LeftRail.UserName = App.MainWindow?.CurrentUserDisplayName ?? "User";
+            LeftRail.SignOutRequested += OnRailSignOutRequested;
+
+            // Overlay launcher availability — hide the FAB if the HUD
+            // binary isn't bundled (dev runs where Overlay\ wasn't
+            // dropped next to the host).
+            OverlayLaunchButton.Visibility = OverlayLauncher.Shared.IsAvailable
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            OverlayLauncher.Shared.PropertyChanged += OnOverlayStateChanged;
+        }
+
+        private void OnRailSignOutRequested(object? sender, EventArgs e)
+        {
+            App.MainWindow?.SignOut();
         }
 
         // ── Dashboard filter buttons (Race/Practice + License) ─────
@@ -103,9 +123,57 @@ namespace RaceCorProDrive.Pages
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DashboardPoller.Shared.PropertyChanged -= OnPollerChanged;
+            LeftRail.SignOutRequested -= OnRailSignOutRequested;
+            OverlayLauncher.Shared.PropertyChanged -= OnOverlayStateChanged;
             // Keep polling alive even when this Page is unloaded so
             // notifications + cached state survive nav transitions.
             // Sign-out flows call Stop() explicitly.
+        }
+
+        // MARK: - Overlay launcher
+
+        private void OnOverlayLaunchClick(object sender, RoutedEventArgs e)
+        {
+            var process = OverlayLauncher.Shared.Launch();
+            if (process == null) return;
+
+            // Minimize (not Hide) the dashboard window. AppWindow.Hide
+            // on a chromeless WinUI 3 window where this is the only
+            // top-level Window can collapse the dispatcher loop and
+            // shut the host process down entirely; minimizing keeps
+            // the window in the OS window list and reliably restores
+            // when the overlay process exits.
+            MinimizeMainWindow();
+        }
+
+        private void OnOverlayStateChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(OverlayLauncher.IsRunning)) return;
+            if (OverlayLauncher.Shared.IsRunning) return;
+
+            // Overlay just exited - restore the dashboard window.
+            // PropertyChanged fires from a worker thread when the OS
+            // reaps the process, so marshal back onto the UI
+            // dispatcher before touching the window.
+            DispatcherQueue.TryEnqueue(RestoreMainWindow);
+        }
+
+        private static void MinimizeMainWindow()
+        {
+            var presenter = App.MainWindow?.AppWindow?.Presenter
+                as Microsoft.UI.Windowing.OverlappedPresenter;
+            presenter?.Minimize();
+        }
+
+        private static void RestoreMainWindow()
+        {
+            var window = App.MainWindow;
+            if (window == null) return;
+            if (window.AppWindow?.Presenter is Microsoft.UI.Windowing.OverlappedPresenter p)
+            {
+                p.Restore();
+            }
+            window.Activate();
         }
 
         private void OnPollerChanged(object? sender, PropertyChangedEventArgs e)
@@ -152,10 +220,10 @@ namespace RaceCorProDrive.Pages
                     PopulatePerformance(dash);
                     break;
                 case DashboardTabs.Tab.NextRace:
-                    PopulatePlaceholder("Next Race", "Race-suggestion ideas land here once the Performance tab feels complete.");
+                    PopulateNextRace(dash);
                     break;
                 case DashboardTabs.Tab.Previous:
-                    PopulatePlaceholder("Previous Races", "Recent race rows will populate here from the dashboard payload's recentSessions field.");
+                    PopulatePrevious(dash);
                     break;
             }
         }
@@ -166,9 +234,69 @@ namespace RaceCorProDrive.Pages
         {
             MainContent.Children.Add(BuildShouldYouRace(dash));
             MainContent.Children.Add(BuildStrengthsWatchOut(dash));
-            MainContent.Children.Add(BuildVizPlaceholder("Race Calendar"));
-            MainContent.Children.Add(BuildVizPlaceholder("Race Schedule"));
-            MainContent.Children.Add(BuildVizPlaceholder("Driver DNA"));
+            MainContent.Children.Add(BuildVisualizationsRow(dash));
+        }
+
+        /// <summary>
+        /// Calendar / Schedule / DNA in a 3-up grid (33% each, 14pt
+        /// gaps). Mac stacks these vertically full-width; the Windows
+        /// dashboard has more horizontal real estate so a row of three
+        /// equal cards reads better.
+        /// </summary>
+        private static Microsoft.UI.Xaml.Controls.Grid BuildVisualizationsRow(Dashboard? dash)
+        {
+            var row = new Microsoft.UI.Xaml.Controls.Grid { ColumnSpacing = 14 };
+            row.ColumnDefinitions.Add(new Microsoft.UI.Xaml.Controls.ColumnDefinition
+            {
+                Width = new Microsoft.UI.Xaml.GridLength(1, Microsoft.UI.Xaml.GridUnitType.Star),
+            });
+            row.ColumnDefinitions.Add(new Microsoft.UI.Xaml.Controls.ColumnDefinition
+            {
+                Width = new Microsoft.UI.Xaml.GridLength(1, Microsoft.UI.Xaml.GridUnitType.Star),
+            });
+            row.ColumnDefinitions.Add(new Microsoft.UI.Xaml.Controls.ColumnDefinition
+            {
+                Width = new Microsoft.UI.Xaml.GridLength(1, Microsoft.UI.Xaml.GridUnitType.Star),
+            });
+
+            var calendar = new RaceCalendarHeatmap
+            {
+                Sessions = DashboardPoller.Shared.Sessions,
+            };
+            Microsoft.UI.Xaml.Controls.Grid.SetColumn(calendar, 0);
+            row.Children.Add(calendar);
+
+            var schedule = new RaceScheduleScatter { Buckets = dash?.ScatterBuckets };
+            Microsoft.UI.Xaml.Controls.Grid.SetColumn(schedule, 1);
+            row.Children.Add(schedule);
+
+            var dna = new DriverDNARadar { Dashboard = dash };
+            Microsoft.UI.Xaml.Controls.Grid.SetColumn(dna, 2);
+            row.Children.Add(dna);
+
+            return row;
+        }
+
+        // MARK: - Next Race tab
+
+        private void PopulateNextRace(Dashboard? dash)
+        {
+            MainContent.Children.Add(new NextRaceTabContent
+            {
+                Ideas = dash?.NextRaceIdeas,
+                Lookups = dash?.Lookups,
+            });
+        }
+
+        // MARK: - Previous Races tab
+
+        private void PopulatePrevious(Dashboard? dash)
+        {
+            MainContent.Children.Add(new PreviousRacesTabContent
+            {
+                Cards = DashboardPoller.Shared.PreviousRaces,
+                Lookups = dash?.Lookups,
+            });
         }
 
         // BuildShouldYouRace is now an instance method (not static) because it
@@ -358,77 +486,6 @@ namespace RaceCorProDrive.Pages
                 };
             }
             return panel;
-        }
-
-        /// <summary>
-        /// Until the Win2D port lands, the three viz cards (calendar /
-        /// schedule / DNA) render as panel placeholders so the layout
-        /// rhythm matches the macOS dashboard top-to-bottom and we
-        /// can swap each one in independently.
-        /// </summary>
-        private static Panel BuildVizPlaceholder(string title)
-        {
-            var stack = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8 };
-            stack.Children.Add(new TextBlock
-            {
-                Text = title,
-                FontSize = 13,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextPrimaryBrush"],
-            });
-            stack.Children.Add(new Border
-            {
-                Height = 96,
-                CornerRadius = new CornerRadius(8),
-                Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BgBaseBrush"],
-                Opacity = 0.3,
-                Child = new TextBlock
-                {
-                    Text = "Coming soon",
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    FontSize = 11,
-                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextMutedBrush"],
-                },
-            });
-            return new Panel { Content = stack, Padding = new Thickness(14) };
-        }
-
-        // MARK: - Other tabs (placeholders for v1)
-
-        private void PopulatePlaceholder(string title, string sub)
-        {
-            MainContent.Children.Add(new Panel
-            {
-                Padding = new Thickness(40),
-                Content = new StackPanel
-                {
-                    Orientation = Orientation.Vertical,
-                    Spacing = 6,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Children =
-                    {
-                        new TextBlock
-                        {
-                            Text = title.ToUpperInvariant(),
-                            FontSize = 11,
-                            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                            CharacterSpacing = 200,
-                            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextDimBrush"],
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                        },
-                        new TextBlock
-                        {
-                            Text = sub,
-                            FontSize = 13,
-                            TextWrapping = TextWrapping.Wrap,
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            TextAlignment = TextAlignment.Center,
-                            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
-                        },
-                    },
-                },
-            });
         }
 
         // MARK: - Helpers

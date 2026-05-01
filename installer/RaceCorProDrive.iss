@@ -21,7 +21,7 @@
 #define MyAppPublisher   "K10 Motorsports"
 #define MyAppURL         "https://prodrive.racecor.io"
 #define MyAppExeName     "RaceCorProDrive.exe"
-#define HudExeName       "RaceCorOverlay.exe"
+#define HudExeName       "RaceCorProDriveOverlay.exe"
 
 ; Version — driven by the git tag in CI, falls back for local builds.
 #ifndef AppVersion
@@ -45,6 +45,16 @@
 #ifndef HUD_UNPACKED
   #define HUD_UNPACKED "..\..\prodrive-overlay\dist\win-unpacked"
 #endif
+; PLUGIN_UNPACKED expects a tree containing the plugin DLLs at its
+; root (RaceCorProDrive.dll + IRSDKSharper/Newtonsoft/etc.) and a
+; racecorprodrive-data/ subfolder for the JSON datasets. The plugin
+; repo's CI release workflow assembles that layout; for local builds
+; we point at the build/ output folder which already contains the
+; DLLs, and rely on the data folder being copied alongside it (or on
+; the user not needing the data side for installer smoke tests).
+;
+; If PLUGIN_UNPACKED isn't defined and the path below doesn't exist,
+; the [Files] #ifdef below silently skips the plugin payload.
 
 [Setup]
 ; Per-user install under %LOCALAPPDATA%\Programs\RaceCor — no admin
@@ -212,40 +222,87 @@ begin
   end;
 end;
 
-// Inno Setup helper: collect every (non-dir) file directly under `dir`.
-function ListPluginFiles(dir: String; var outFiles: TArrayOfString): Boolean;
+// Recursively mirror every file from `srcDir` into `destDir`,
+// preserving subdirectory structure. Used to copy the plugin tree
+// (DLLs at the root + racecorprodrive-data/ subfolder full of JSON
+// datasets) from {app}\Plugin into SimHub. The previous version
+// only enumerated direct children, which meant the data folder
+// shipped to {app}\Plugin via [Files] but never made it into
+// SimHub - the plugin then loaded but couldn't read its datasets.
+procedure CopyTreeRecursive(srcDir, destDir: String);
 var
   fr: TFindRec;
+  childSrc, childDest: String;
 begin
-  Result := False;
-  SetArrayLength(outFiles, 0);
-  if FindFirst(dir + '\*', fr) then
+  if not DirExists(srcDir) then Exit;
+  if not DirExists(destDir) then ForceDirectories(destDir);
+  if FindFirst(srcDir + '\*', fr) then
   begin
     try
       repeat
-        if (fr.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
-        begin
-          SetArrayLength(outFiles, GetArrayLength(outFiles) + 1);
-          outFiles[GetArrayLength(outFiles) - 1] := dir + '\' + fr.Name;
-        end;
+        if (fr.Name = '.') or (fr.Name = '..') then Continue;
+        childSrc := srcDir + '\' + fr.Name;
+        childDest := destDir + '\' + fr.Name;
+        if (fr.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+          CopyTreeRecursive(childSrc, childDest)
+        else
+          FileCopy(childSrc, childDest, False);
       until not FindNext(fr);
-      Result := GetArrayLength(outFiles) > 0;
     finally
       FindClose(fr);
     end;
   end;
 end;
 
-// Copy every file from {app}\Plugin into the SimHub install dir so
-// SimHub auto-loads RaceCorProDrive.dll on next start. Runs after the
-// main file copy so {app}\Plugin already exists.
+// True if SimHubWPF.exe is currently running.
+function IsSimHubRunning(): Boolean;
+var
+  resultCode: Integer;
+begin
+  // tasklist exits 0 even when the process isn't found; we check the
+  // output via findstr. ShellExec with SW_HIDE keeps the user from
+  // seeing a console flash.
+  Exec(ExpandConstant('{cmd}'),
+       '/C tasklist /FI "IMAGENAME eq SimHubWPF.exe" | findstr /I "SimHubWPF.exe"',
+       '', SW_HIDE, ewWaitUntilTerminated, resultCode);
+  Result := (resultCode = 0);
+end;
+
+// Politely ask SimHub to close, escalating to taskkill /F if needed.
+// Returns True iff SimHub is no longer running when we exit.
+function StopSimHub(): Boolean;
+var
+  resultCode: Integer;
+  attempts: Integer;
+begin
+  if not IsSimHubRunning() then begin Result := True; Exit; end;
+  // taskkill without /F first - lets SimHub flush state.
+  Exec(ExpandConstant('{cmd}'),
+       '/C taskkill /IM SimHubWPF.exe /T',
+       '', SW_HIDE, ewWaitUntilTerminated, resultCode);
+  for attempts := 1 to 10 do
+  begin
+    Sleep(500);
+    if not IsSimHubRunning() then begin Result := True; Exit; end;
+  end;
+  // Force-kill fallback so the file copies don't fail with sharing
+  // violations on RaceCorProDrive.dll.
+  Exec(ExpandConstant('{cmd}'),
+       '/C taskkill /F /IM SimHubWPF.exe /T',
+       '', SW_HIDE, ewWaitUntilTerminated, resultCode);
+  Sleep(1000);
+  Result := not IsSimHubRunning();
+end;
+
+// Copy plugin DLLs + datasets from {app}\Plugin into the SimHub install
+// dir so SimHub auto-loads RaceCorProDrive.dll on next start. Runs
+// after the main file copy so {app}\Plugin already exists.
 procedure InstallSimHubPlugin();
 var
   simHub: String;
   pluginSrc: String;
-  files: TArrayOfString;
-  i: Integer;
-  dest: String;
+  wasRunning: Boolean;
+  resultCode: Integer;
 begin
   pluginSrc := ExpandConstant('{app}\Plugin');
   if not DirExists(pluginSrc) then Exit;
@@ -253,17 +310,39 @@ begin
   if simHub = '' then
   begin
     MsgBox('SimHub was not detected on this machine.' + #13#10 + #13#10 +
-           'The RaceCor SimHub plugin DLLs are at:' + #13#10 + pluginSrc + #13#10 + #13#10 +
-           'After installing SimHub, copy those files into the SimHub install folder ' +
-           '(next to SimHubWPF.exe) to enable the plugin.',
+           'The RaceCor SimHub plugin files are at:' + #13#10 + pluginSrc + #13#10 + #13#10 +
+           'After installing SimHub, copy that folder''s contents into the SimHub ' +
+           'install folder (next to SimHubWPF.exe) to enable the plugin.',
            mbInformation, MB_OK);
     Exit;
   end;
-  if not ListPluginFiles(pluginSrc, files) then Exit;
-  for i := 0 to GetArrayLength(files) - 1 do
+
+  // Stop SimHub before touching its install dir, so DLL replacement
+  // doesn't fail with a file lock and the user doesn't end up with
+  // a stale plugin loaded in the running instance.
+  wasRunning := IsSimHubRunning();
+  if wasRunning then
   begin
-    dest := simHub + '\' + ExtractFileName(files[i]);
-    FileCopy(files[i], dest, False);
+    if not StopSimHub() then
+    begin
+      MsgBox('Could not stop SimHub. Close it manually and re-run the installer ' +
+             'to finish installing the RaceCor plugin.',
+             mbError, MB_OK);
+      Exit;
+    end;
+  end;
+
+  // Mirror the entire {app}\Plugin tree into SimHub - root-level
+  // DLLs land next to SimHubWPF.exe (where SimHub auto-discovers
+  // them), and racecorprodrive-data/ is preserved as a subfolder.
+  CopyTreeRecursive(pluginSrc, simHub);
+
+  // Restart SimHub if we shut it down. Best-effort - if the launch
+  // fails, the next SimHub start will pick the plugin up anyway.
+  if wasRunning then
+  begin
+    Exec(simHub + '\SimHubWPF.exe', '', simHub,
+         SW_SHOWNORMAL, ewNoWait, resultCode);
   end;
 end;
 

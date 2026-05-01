@@ -59,15 +59,26 @@ namespace RaceCorProDrive.DesignSystem.Components
                 HorizontalScrollMode = ScrollMode.Disabled,
             };
 
-            var stack = new StackPanel { Orientation = Orientation.Vertical };
-            stack.Children.Add(_tabRow);
-            stack.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
+            // The shell needs a Grid (not a StackPanel) so the
+            // ScrollViewer's row gets a bounded "*" height. Inside a
+            // vertical StackPanel, the ScrollViewer asks for the full
+            // height of its content, gets it, and never scrolls —
+            // which is what made the Tracks/Cars list appear stuck.
+            var shellGrid = new Grid();
+            shellGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            shellGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            shellGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            Grid.SetRow(_tabRow, 0);
+            shellGrid.Children.Add(_tabRow);
+            var divider = new Microsoft.UI.Xaml.Shapes.Rectangle
             {
                 Height = 1,
                 Fill = (Brush)Application.Current.Resources["BorderSubtleBrush"],
-            });
-            stack.Children.Add(_scroll);
-            Grid.SetRow(_scroll, 1);
+            };
+            Grid.SetRow(divider, 1);
+            shellGrid.Children.Add(divider);
+            Grid.SetRow(_scroll, 2);
+            shellGrid.Children.Add(_scroll);
 
             var shell = new Border
             {
@@ -80,8 +91,14 @@ namespace RaceCorProDrive.DesignSystem.Components
                 BorderBrush = new SolidColorBrush(Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF)),
                 BorderThickness = new Thickness(0.5),
                 CornerRadius = new CornerRadius(18),
-                Margin = new Thickness(0, 8, 12, 10),
-                Child = stack,
+                // Top margin 8 → 40: 32pt belongs to the chromeless
+                // drag region (system caption buttons live in the
+                // top-right ~140×32pt) plus 8pt of breathing room.
+                // Sidebar's Tracks/Cars tabs were under the drag
+                // region for the y=8–32 strip, which made the top
+                // half of the tabs unclickable.
+                Margin = new Thickness(0, 40, 12, 10),
+                Child = shellGrid,
             };
             Content = shell;
 

@@ -72,7 +72,14 @@ namespace RaceCorProDrive.DesignSystem.Components
         public ShouldYouRacePanel()
         {
             _content = new StackPanel { Orientation = Orientation.Vertical, Spacing = 0 };
-            _shell = new Panel { Content = _content, Padding = new Thickness(14) };
+            // No outer Padding on the shell — the inner Border in
+            // Panel already pads to 16pt. Setting an additional
+            // ContentControl-level Padding here was offsetting the
+            // panel's outer edge differently than the sibling
+            // StrengthsWatchOutPanel (which doesn't set Padding),
+            // making the left edges of the two cards visibly
+            // misalign in the dashboard column.
+            _shell = new Panel { Content = _content };
             Content = _shell;
             Rebuild();
         }
