@@ -7,48 +7,104 @@
     Unloaded="OnUnloaded">
     <!--
         Settings UI for the in-game HUD. Backed by
-        OverlaySettingsService — every control is two-way wired against
-        the JSON file the Electron HUD reads. Changes flow:
-            Toggle in this UI → Save() → file write → HUD's fs.watch →
-            HUD config.js applies live.
-        The HUD's in-game move/resize hotkey writes back to the same
-        file; this page's FileSystemWatcher reloads the form when that
-        happens so both directions stay in sync.
+        OverlaySettingsService. Architecture:
 
-        Layout: a NavigationView sidebar of categories on the left, the
-        currently-selected category's controls on the right. Categories
-        are populated programmatically in code-behind because most
-        rows are repeating (label + toggle + caption) and a XAML loop
-        for each would triple the file size for no readability win.
+          ┌─ NavigationView (left) ─┬─ Page header with status ─┐
+          │  Visual                 │  ScrollViewer:            │
+          │  Commentary             │   - SettingsCard 1        │
+          │  Recording              │   - SettingsCard 2        │
+          │  System                 │   - SettingsCard 3        │
+          │  Hardware (PR-3)        │   - ...                   │
+          └─────────────────────────┴───────────────────────────┘
+
+        Race Rules removed (incident counts come from iRacing telemetry,
+        force flag was dev-only, drive/rally modes never wired up). HUD
+        launch + Hotkeys merged into System. Commentary + Coach merged
+        into Commentary.
+
+        Visual is currently a stub mirroring the legacy flat toggles -
+        PR-B replaces it with a drag/drop module-group editor that
+        targets the overlay's 6 anchor zones (TL/TC/TR/BL/BC/BR).
     -->
 
-    <Grid>
+    <Grid RequestedTheme="Dark">
         <design:ThemedBackgroundControl />
 
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Category nav. Pinned to a 220pt left rail so the right
+             pane has predictable width. -->
         <NavigationView
             x:Name="CategoryNav"
+            Grid.Column="0"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
+            IsPaneToggleButtonVisible="False"
             PaneDisplayMode="Left"
-            OpenPaneLength="200"
-            SelectionChanged="OnCategoryChanged">
+            OpenPaneLength="220"
+            IsPaneOpen="True"
+            SelectionChanged="OnCategoryChanged"
+            Background="Transparent">
 
             <NavigationView.MenuItems>
-                <NavigationViewItem Tag="hud"        Content="HUD" />
-                <NavigationViewItem Tag="display"    Content="Display" />
-                <NavigationViewItem Tag="components" Content="Components" />
+                <NavigationViewItem Tag="visual"     Content="Visual" />
                 <NavigationViewItem Tag="commentary" Content="Commentary" />
                 <NavigationViewItem Tag="recording"  Content="Recording" />
-                <NavigationViewItem Tag="advanced"   Content="Advanced" />
+                <NavigationViewItem Tag="system"     Content="System" />
             </NavigationView.MenuItems>
+        </NavigationView>
 
-            <ScrollViewer Padding="32,24,32,32"
+        <!-- Right pane: header (title + caption + save status) +
+             scrollable card list. -->
+        <Grid Grid.Column="1" Padding="40,32,40,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Vertical" Spacing="4">
+                    <TextBlock x:Name="PageTitleText"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               CharacterSpacing="200"
+                               Foreground="{StaticResource BrandRedBrush}"
+                               Text="SETTINGS" />
+                    <TextBlock x:Name="PageHeadingText"
+                               FontSize="28"
+                               FontWeight="Black"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Text="Visual" />
+                    <TextBlock x:Name="PageCaptionText"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               MaxWidth="640" />
+                </StackPanel>
+                <TextBlock x:Name="SaveStatusText"
+                           Grid.Column="1"
+                           VerticalAlignment="Bottom"
+                           FontSize="11"
+                           FontFamily="Consolas"
+                           Foreground="{StaticResource TextDimBrush}"
+                           Text="" />
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="FormHost"
+                <StackPanel x:Name="CardsHost"
                             Orientation="Vertical"
                             Spacing="14"
-                            MaxWidth="640" />
+                            MaxWidth="780"
+                            HorizontalAlignment="Left" />
             </ScrollViewer>
-        </NavigationView>
+        </Grid>
     </Grid>
 </Page>

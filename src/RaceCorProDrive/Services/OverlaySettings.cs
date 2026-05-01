@@ -50,6 +50,22 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("showIncidents")]    public bool? ShowIncidents { get; set; }
         [JsonPropertyName("showSpotter")]      public bool? ShowSpotter { get; set; }
 
+        // ── Layout / display extensions ──
+        [JsonPropertyName("bottomYOffset")]   public int? BottomYOffset { get; set; }
+        // Per-group anchor map (PR-B: drag/drop visual editor writes
+        // here). 6 zones: top-left, top-center, top-right, bottom-left,
+        // bottom-center, bottom-right. Keys are group identifiers
+        // (e.g. "tachoBlock", "leaderboardPanel", "spotterPanel").
+        [JsonPropertyName("groupPositions")]  public Dictionary<string, string>? GroupPositions { get; set; }
+
+        // ── Branding (was BrandingSection on web) ──
+        [JsonPropertyName("logoSubtitle")]    public string? LogoSubtitle { get; set; }
+
+        // ── Leaderboard ──
+        [JsonPropertyName("lbFocus")]         public string? LbFocus { get; set; }
+        [JsonPropertyName("lbMaxRows")]       public int? LbMaxRows { get; set; }
+        [JsonPropertyName("lbExpandToFill")]  public bool? LbExpandToFill { get; set; }
+
         // ── Commentary ──
         [JsonPropertyName("commentaryPromptDuration")]    public int? CommentaryPromptDuration { get; set; }
         [JsonPropertyName("commentaryShowTopicTitle")]    public bool? CommentaryShowTopicTitle { get; set; }
@@ -61,26 +77,65 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("commentaryCatBehavior")]       public bool? CommentaryCatBehavior { get; set; }
         [JsonPropertyName("commentaryDriverFirstName")]   public string? CommentaryDriverFirstName { get; set; }
         [JsonPropertyName("commentaryDriverLastName")]    public string? CommentaryDriverLastName { get; set; }
+        // Coach context categories (the user describing their setup
+        // and skill so the coach commentary tunes itself).
+        [JsonPropertyName("commentaryCatHardware")]       public bool? CommentaryCatHardware { get; set; }
+        [JsonPropertyName("commentaryCatGameFeel")]       public bool? CommentaryCatGameFeel { get; set; }
+        [JsonPropertyName("commentaryCatCarResponse")]    public bool? CommentaryCatCarResponse { get; set; }
+        [JsonPropertyName("commentaryCatRacingExperience")] public bool? CommentaryCatRacingExperience { get; set; }
         [JsonPropertyName("coachTone")]                   public string? CoachTone { get; set; }
         [JsonPropertyName("coachDepth")]                  public string? CoachDepth { get; set; }
 
         // ── Recording / replay buffer ──
-        [JsonPropertyName("recordingQuality")]   public string? RecordingQuality { get; set; }
-        [JsonPropertyName("recordingMicEnabled")] public bool? RecordingMicEnabled { get; set; }
-        [JsonPropertyName("recordingMicDevice")] public string? RecordingMicDevice { get; set; }
-        [JsonPropertyName("replayBufferEnabled")] public bool? ReplayBufferEnabled { get; set; }
-        [JsonPropertyName("replayBufferSeconds")] public int? ReplayBufferSeconds { get; set; }
+        [JsonPropertyName("recordingQuality")]            public string? RecordingQuality { get; set; }
+        [JsonPropertyName("recordingMicEnabled")]         public bool? RecordingMicEnabled { get; set; }
+        [JsonPropertyName("recordingMicDevice")]          public string? RecordingMicDevice { get; set; }
+        // Mic + system-audio volumes stored as 0..1 floats (web slider
+        // scales by *100 for display).
+        [JsonPropertyName("recordingMicVolume")]          public double? RecordingMicVolume { get; set; }
+        [JsonPropertyName("recordingSystemAudioDevice")]  public string? RecordingSystemAudioDevice { get; set; }
+        [JsonPropertyName("recordingSystemVolume")]       public double? RecordingSystemVolume { get; set; }
+        [JsonPropertyName("recordingWebcamDevice")]       public string? RecordingWebcamDevice { get; set; }
+        [JsonPropertyName("recordingFacecamSize")]        public string? RecordingFacecamSize { get; set; }
+        [JsonPropertyName("recordingFacecamPos")]         public string? RecordingFacecamPos { get; set; }
+        [JsonPropertyName("recordingOutputFormat")]       public string? RecordingOutputFormat { get; set; }
+        [JsonPropertyName("recordingEncoder")]            public string? RecordingEncoder { get; set; }
+        [JsonPropertyName("recordingDeleteSource")]       public bool? RecordingDeleteSource { get; set; }
+        [JsonPropertyName("recordingAutoRecord")]         public bool? RecordingAutoRecord { get; set; }
+        [JsonPropertyName("recordingAutoStopOnPit")]      public bool? RecordingAutoStopOnPit { get; set; }
+        [JsonPropertyName("replayBufferEnabled")]         public bool? ReplayBufferEnabled { get; set; }
+        [JsonPropertyName("replayBufferSeconds")]         public int? ReplayBufferSeconds { get; set; }
+        // Web schema uses "replayBufferDuration" (string seconds);
+        // older HUD reads "replayBufferSeconds" (int). Keep both;
+        // SaveAsync mirrors the new value to both.
+        [JsonPropertyName("replayBufferDuration")]        public string? ReplayBufferDuration { get; set; }
 
-        // ── Advanced ──
-        [JsonPropertyName("incPenalty")]        public bool? IncPenalty { get; set; }
-        [JsonPropertyName("incDQ")]             public bool? IncDQ { get; set; }
-        [JsonPropertyName("rallyMode")]         public bool? RallyMode { get; set; }
-        [JsonPropertyName("driveMode")]         public string? DriveMode { get; set; }
-        [JsonPropertyName("forceFlag")]         public string? ForceFlag { get; set; }
+        // ── System ──
         [JsonPropertyName("iracingDataSync")]   public bool? IracingDataSync { get; set; }
         [JsonPropertyName("apiBase")]           public string? ApiBase { get; set; }
         [JsonPropertyName("agentKey")]          public string? AgentKey { get; set; }
         [JsonPropertyName("useRemoteTokens")]   public bool? UseRemoteTokens { get; set; }
+        // Local SimHub plugin URL (for the host's loopback HTTP/WS
+        // talk-to-plugin pipeline). Defaults to the plugin's own
+        // bound port; settable for unusual setups.
+        [JsonPropertyName("simhubUrl")]         public string? SimHubUrl { get; set; }
+
+        // ── DEPRECATED (Race Rules, removed from UI) ──
+        // Kept on the model so existing on-disk JSON deserializes
+        // without losing keys; they're never surfaced in the new
+        // SettingsPage. Overlay still reads them harmlessly. Schedule
+        // a sweep of overlay code to drop the reads, then remove from
+        // the model entirely.
+        [Obsolete("Race-rule incident counts now come from iRacing telemetry, not user setting. Removed from UI.")]
+        [JsonPropertyName("incPenalty")]        public bool? IncPenalty { get; set; }
+        [Obsolete("Race-rule incident counts now come from iRacing telemetry, not user setting. Removed from UI.")]
+        [JsonPropertyName("incDQ")]             public bool? IncDQ { get; set; }
+        [Obsolete("Drive mode never wired up. Removed from UI.")]
+        [JsonPropertyName("driveMode")]         public string? DriveMode { get; set; }
+        [Obsolete("Rally mode never wired up. Removed from UI.")]
+        [JsonPropertyName("rallyMode")]         public bool? RallyMode { get; set; }
+        [Obsolete("Force flag was a dev-only toggle. Removed from UI.")]
+        [JsonPropertyName("forceFlag")]         public string? ForceFlag { get; set; }
 
         // ── WinUI host extensions (not consumed by the HUD) ──
         // The HUD ignores these on read, so we tuck WinUI-specific
@@ -99,18 +154,23 @@ namespace RaceCorProDrive.Services
     /// </summary>
     public static class OverlaySettingsDefaults
     {
+#pragma warning disable CS0618 // intentional: backfill obsolete fields so old JSON round-trips
         public static OverlaySettings Apply(OverlaySettings input)
         {
             // Display
             input.LogoOnlyStart       ??= true;
             input.LayoutPosition      ??= "top-right";
             input.Zoom                ??= 1.0;
+            input.BottomYOffset       ??= 0;
             input.ShowBorders         ??= false;
             input.ShowWebGL           ??= true;
             input.AmbientMode         ??= "auto";
             input.GreenScreen         ??= false;
             input.VisualPreset        ??= "standard";
             input.Theme               ??= "default";
+
+            // Branding
+            input.LogoSubtitle        ??= "";
 
             // Components — most default ON, matching the HUD's defaults.
             input.ShowFuel            ??= true;
@@ -129,33 +189,48 @@ namespace RaceCorProDrive.Services
             input.ShowIncidents       ??= true;
             input.ShowSpotter         ??= true;
 
+            // Leaderboard
+            input.LbFocus             ??= "self";
+            input.LbMaxRows           ??= 6;
+            input.LbExpandToFill      ??= false;
+
             // Commentary
-            input.CommentaryPromptDuration  ??= 8;
-            input.CommentaryShowTopicTitle  ??= true;
-            input.CommentaryEventOnlyMode   ??= false;
-            input.CommentaryDemoMode        ??= false;
-            input.CommentaryCatStrategy     ??= true;
-            input.CommentaryCatTrack        ??= true;
-            input.CommentaryCatRivals       ??= true;
-            input.CommentaryCatBehavior     ??= true;
-            input.CoachTone                 ??= "neutral";
-            input.CoachDepth                ??= "balanced";
+            input.CommentaryPromptDuration       ??= 8;
+            input.CommentaryShowTopicTitle       ??= true;
+            input.CommentaryEventOnlyMode        ??= false;
+            input.CommentaryDemoMode             ??= false;
+            input.CommentaryCatStrategy          ??= true;
+            input.CommentaryCatTrack             ??= true;
+            input.CommentaryCatRivals            ??= true;
+            input.CommentaryCatBehavior          ??= true;
+            input.CommentaryCatHardware          ??= true;
+            input.CommentaryCatGameFeel          ??= true;
+            input.CommentaryCatCarResponse       ??= true;
+            input.CommentaryCatRacingExperience  ??= true;
+            input.CoachTone                      ??= "neutral";
+            input.CoachDepth                     ??= "balanced";
 
             // Recording
-            input.RecordingQuality      ??= "high";
-            input.RecordingMicEnabled   ??= false;
-            input.ReplayBufferEnabled   ??= false;
-            input.ReplayBufferSeconds   ??= 30;
+            input.RecordingQuality          ??= "high";
+            input.RecordingMicEnabled       ??= false;
+            input.RecordingMicVolume        ??= 0.8;
+            input.RecordingSystemVolume     ??= 1.0;
+            input.RecordingFacecamSize      ??= "small";
+            input.RecordingFacecamPos       ??= "bottom-right";
+            input.RecordingOutputFormat     ??= "mp4";
+            input.RecordingEncoder          ??= "auto";
+            input.RecordingDeleteSource     ??= true;
+            input.RecordingAutoRecord       ??= false;
+            input.RecordingAutoStopOnPit    ??= false;
+            input.ReplayBufferEnabled       ??= false;
+            input.ReplayBufferSeconds       ??= 30;
+            input.ReplayBufferDuration      ??= "30";
 
-            // Advanced
-            input.IncPenalty       ??= true;
-            input.IncDQ            ??= true;
-            input.RallyMode        ??= false;
-            input.DriveMode        ??= "circuit";
-            input.ForceFlag        ??= "auto";
+            // System
             input.IracingDataSync  ??= true;
             input.ApiBase          ??= "https://prodrive.racecor.io";
             input.UseRemoteTokens  ??= false;
+            input.SimHubUrl        ??= "http://localhost:8889";
 
             // Host
             input.WinUIAutoLaunchHud  ??= false;
@@ -163,5 +238,6 @@ namespace RaceCorProDrive.Services
 
             return input;
         }
+#pragma warning restore CS0618
     }
 }
