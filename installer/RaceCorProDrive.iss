@@ -223,12 +223,9 @@ begin
 end;
 
 // Recursively mirror every file from `srcDir` into `destDir`,
-// preserving subdirectory structure. Used to copy the plugin tree
-// (DLLs at the root + racecorprodrive-data/ subfolder full of JSON
-// datasets) from {app}\Plugin into SimHub. The previous version
-// only enumerated direct children, which meant the data folder
-// shipped to {app}\Plugin via [Files] but never made it into
-// SimHub - the plugin then loaded but couldn't read its datasets.
+// preserving subdirectory structure. Used for the dataset folder
+// only — SimHub's stock DLLs MUST NOT be overwritten so we don't
+// use this for the root-level plugin DLLs (see CopyAllowListed).
 procedure CopyTreeRecursive(srcDir, destDir: String);
 var
   fr: TFindRec;
@@ -251,6 +248,39 @@ begin
     finally
       FindClose(fr);
     end;
+  end;
+end;
+
+// Copy only the files SimHub doesn't ship. CRITICAL: do not bulk-copy
+// the {app}\Plugin tree into SimHub. SimHub bundles its own
+// Newtonsoft.Json, log4net, and the BCL polyfills (System.Buffers,
+// System.Memory, System.Threading.Tasks.Extensions, etc.) and does
+// strict patch-version checks on those at startup - any mismatch
+// silently disables its ENTIRE plugin manager, not just our plugin.
+// This list is intentionally narrow: our DLL + clearly-third-party
+// deps SimHub doesn't ship. Mirrors the allow-list in
+// scripts/windows/install.bat (dev tool); keep them in sync when
+// adding new plugin dependencies.
+procedure CopyAllowListed(srcDir, destDir: String);
+var
+  i: Integer;
+  allowList: array of String;
+  src: String;
+begin
+  if not DirExists(srcDir) then Exit;
+  if not DirExists(destDir) then ForceDirectories(destDir);
+  SetArrayLength(allowList, 6);
+  allowList[0] := 'RaceCorProDrive.dll';
+  allowList[1] := 'RaceCorProDrive.pdb';
+  allowList[2] := 'IRSDKSharper.dll';
+  allowList[3] := 'Fleck.dll';
+  allowList[4] := 'MessagePack.dll';
+  allowList[5] := 'MessagePack.Annotations.dll';
+  for i := 0 to GetArrayLength(allowList) - 1 do
+  begin
+    src := srcDir + '\' + allowList[i];
+    if FileExists(src) then
+      FileCopy(src, destDir + '\' + allowList[i], False);
   end;
 end;
 
@@ -332,10 +362,20 @@ begin
     end;
   end;
 
-  // Mirror the entire {app}\Plugin tree into SimHub - root-level
-  // DLLs land next to SimHubWPF.exe (where SimHub auto-discovers
-  // them), and racecorprodrive-data/ is preserved as a subfolder.
-  CopyTreeRecursive(pluginSrc, simHub);
+  // Copy ONLY the allow-listed DLLs (our DLL + clearly-third-party
+  // deps SimHub doesn't ship). Bulk-copying the {app}\Plugin tree
+  // here would overwrite SimHub's stock Newtonsoft.Json, log4net,
+  // System.Buffers, System.Memory, etc. with our copies — SimHub's
+  // strict patch-version checks then silently disable its entire
+  // plugin manager (this is what was murdering SimHub installs).
+  CopyAllowListed(pluginSrc, simHub);
+
+  // Dataset folder is safe to bulk-mirror — SimHub never ships
+  // racecorprodrive-data/ so there's nothing to overwrite. Recursive
+  // copy preserves the subfolder structure (commentary fragments,
+  // tracks, cars, etc.).
+  if DirExists(pluginSrc + '\racecorprodrive-data') then
+    CopyTreeRecursive(pluginSrc + '\racecorprodrive-data', simHub + '\racecorprodrive-data');
 
   // Restart SimHub if we shut it down. Best-effort - if the launch
   // fails, the next SimHub start will pick the plugin up anyway.
