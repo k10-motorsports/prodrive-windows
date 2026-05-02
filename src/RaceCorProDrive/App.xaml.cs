@@ -78,6 +78,14 @@ namespace RaceCorProDrive
                 IRacingDetector.Shared.Start();
                 BootTrace("IRacingDetector started");
 
+                // Start the Moza serial poll thread. Idempotent and
+                // background — it's cheap to run even when no Moza
+                // hardware is attached (the port enumerator just
+                // returns nothing). The Hardware tab in Settings
+                // reads off MozaService.Shared.Manager directly.
+                Services.Moza.MozaService.Shared.Start();
+                BootTrace("MozaService started");
+
                 // Process any URI captured during initial launch (rare; usually
                 // OAuth comes back via redirected activation while we're already
                 // running — see HandleProtocolActivation).

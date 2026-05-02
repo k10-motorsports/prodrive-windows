@@ -24,7 +24,20 @@ namespace RaceCorProDrive.Pages
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
+            // Library has no per-page tabs or filters — clear the
+            // titlebar slots in case a previous page (Dashboard /
+            // Settings) left widgets there.
+            App.MainWindow?.SetTitleBarTabs(null);
+            App.MainWindow?.SetTitleBarFilters(null);
+
             await Refresh();
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            // No persistent subscriptions to detach — Refresh runs
+            // synchronously per Loaded / Refresh tap. Hook is here so
+            // the XAML's Unloaded="OnUnloaded" attribute resolves.
         }
 
         private async void OnRefresh(object sender, RoutedEventArgs e)
@@ -63,33 +76,15 @@ namespace RaceCorProDrive.Pages
             }
         }
 
-        private async void OnTileClick(object sender, RoutedEventArgs e)
+        private void OnTileClick(object sender, RoutedEventArgs e)
         {
             if (sender is not Button btn) return;
             var path = btn.Tag as string;
             if (string.IsNullOrEmpty(path)) return;
-
-            // Stub editor — show metadata in a content dialog. Real editor lands later.
-            var item = FindItem(path);
-            if (item == null) return;
-
-            var dialog = new ContentDialog
-            {
-                Title = item.Title,
-                Content = BuildDetailContent(item),
-                CloseButtonText = "Close",
-                XamlRoot = this.XamlRoot,
-            };
-            await dialog.ShowAsync();
-        }
-
-        private LibraryItemViewModel? FindItem(string path)
-        {
-            foreach (var i in _items)
-            {
-                if (string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase)) return i;
-            }
-            return null;
+            // Navigate into the EditorPage with the bundle path as the
+            // navigation parameter. The page reads it in OnNavigatedTo
+            // and loads the video + telemetry header.
+            App.MainWindow?.NavigateToPage("editor", path);
         }
 
         private async void OnSendToMac(object sender, RoutedEventArgs e)
@@ -122,48 +117,6 @@ namespace RaceCorProDrive.Pages
             });
         }
 
-        private static StackPanel BuildDetailContent(LibraryItemViewModel item)
-        {
-            var stack = new StackPanel { Spacing = 6 };
-            void Row(string label, string value)
-            {
-                var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var l = new TextBlock
-                {
-                    Text = label.ToUpperInvariant(),
-                    FontSize = 9,
-                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray),
-                };
-                var v = new TextBlock
-                {
-                    Text = value,
-                    FontSize = 12,
-                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
-                    TextWrapping = TextWrapping.Wrap,
-                    IsTextSelectionEnabled = true,
-                };
-                Grid.SetColumn(l, 0);
-                Grid.SetColumn(v, 1);
-                grid.Children.Add(l);
-                grid.Children.Add(v);
-                stack.Children.Add(grid);
-            }
-
-            Row("Path", item.Path);
-            Row("Bundle ID", item.BundleId);
-            Row("Track", item.Track);
-            Row("Car", item.Car);
-            Row("Duration", item.Duration);
-            Row("Resolution", item.Resolution);
-            Row("File size", item.FileSize);
-            Row("Frames", item.FrameCount);
-            Row("Recorded by", item.RecordedBy);
-            Row("Created", item.CreatedAt);
-            return stack;
-        }
     }
 
     /// <summary>
