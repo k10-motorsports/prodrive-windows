@@ -217,10 +217,6 @@ namespace RaceCorProDrive.Pages
                 "Outlines every component for layout debugging.",
                 () => _settings.ShowBorders ?? false,
                 v => _settings.ShowBorders = v));
-            effects.AddRow(MakeToggleRow("Green-screen mode",
-                "Replace the background with pure green for OBS chroma keying.",
-                () => _settings.GreenScreen ?? false,
-                v => _settings.GreenScreen = v));
             AddCard(effects);
 
             var modules = new SettingsCard
