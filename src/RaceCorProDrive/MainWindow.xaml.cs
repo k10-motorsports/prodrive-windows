@@ -130,34 +130,38 @@ namespace RaceCorProDrive
             var process = OverlayLauncher.Shared.Launch();
             if (process == null) return;
 
-            // Minimize (not Hide) the dashboard window. AppWindow.Hide
-            // on a chromeless WinUI 3 window where this is the only
-            // top-level Window can collapse the dispatcher loop and
-            // shut the host process down entirely; minimizing keeps
-            // the window in the OS window list and reliably restores
-            // when the overlay process exits.
-            var presenter = AppWindow?.Presenter
-                as Microsoft.UI.Windowing.OverlappedPresenter;
-            presenter?.Minimize();
+            // Don't minimize the host while racing — switch to Settings
+            // instead so the user has a useful surface to look at while
+            // the in-game HUD runs on top of iRacing. The overlay grabs
+            // the in-game window's focus on its own.
+            NavigateToPage("settings");
         }
 
         private void OnOverlayStateChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(OverlayLauncher.IsRunning)) return;
-            if (OverlayLauncher.Shared.IsRunning) return;
+            // Window stays visible while the overlay runs (we navigate to
+            // Settings instead of minimizing), so there's nothing to
+            // restore here. Hook is left in place for future hardware
+            // signals (e.g. iRacing exited, suggest re-arming the HUD).
+        }
 
-            // Overlay just exited — restore the dashboard window.
-            // PropertyChanged fires from a worker thread when the OS
-            // reaps the process, so marshal back onto the UI dispatcher
-            // before touching the window.
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                if (AppWindow?.Presenter is Microsoft.UI.Windowing.OverlappedPresenter p)
-                {
-                    p.Restore();
-                }
-                Activate();
-            });
+        // ── Title-bar slot pushes (called by pages) ──────────────────
+        //
+        // Pages own their tabs + filter controls (DashboardTabs,
+        // SettingsPage's HorizontalTabs, the Race/License DropDownButtons).
+        // They construct + wire those controls and hand them to the
+        // window-level title-bar slots so the chrome reads as one
+        // continuous strip across the top of the window. The slot
+        // hosts are ContentControls — assignment to .Content reparents
+        // any UIElement cleanly. Pass null on Unload to clear.
+        public void SetTitleBarTabs(UIElement? tabs)
+        {
+            TitleBarTabsHost.Content = tabs;
+        }
+
+        public void SetTitleBarFilters(UIElement? filters)
+        {
+            TitleBarFiltersHost.Content = filters;
         }
     }
 }
