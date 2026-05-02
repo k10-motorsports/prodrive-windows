@@ -90,5 +90,6 @@ namespace RaceCorProDrive.DesignSystem
         public const string Profile      = "user";
         public const string Settings     = "settings";
         public const string LaunchHud    = "launcher-option-1-gauge";
+        public const string Library      = "film";
     }
 }
