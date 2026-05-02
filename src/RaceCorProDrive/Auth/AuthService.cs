@@ -28,7 +28,13 @@ namespace RaceCorProDrive.Auth
         private const string BaseUrl = "https://prodrive.racecor.io";
 
         private readonly TokenStore _tokenStore = new();
-        private readonly ApiClient _apiClient = new();
+        // Use the singleton, NOT a private instance — DashboardPoller
+        // and friends call ApiClient.Shared, so any bearer set via this
+        // field has to be the one those callers read off. The previous
+        // `new()` here meant SetAuthToken populated a private field
+        // nobody else looked at, leaving the dashboard hitting the API
+        // with no Authorization header (silent 401 → spinner forever).
+        private readonly ApiClient _apiClient = ApiClient.Shared;
         private User? _currentUser;
 
         public User? CurrentUser => _currentUser;
