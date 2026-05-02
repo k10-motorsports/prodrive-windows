@@ -28,12 +28,12 @@
     -->
 
     <Grid RequestedTheme="Dark">
-        <design:ThemedBackgroundControl />
-
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+
+        <design:ThemedBackgroundControl />
 
         <!-- Category nav. Pinned to a 220pt left rail so the right
              pane has predictable width. -->
