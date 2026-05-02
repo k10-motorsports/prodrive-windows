@@ -41,6 +41,14 @@
       Send → pick a Mac" UX; we don't need a continuous browser.
     -->
     <PackageReference Include="Zeroconf" Version="3.6.11" />
+    <!--
+      Moza serial protocol talks straight to CDC ACM ports. .NET 8
+      moved both of these out of the BCL into NuGet packages —
+      System.IO.Ports for SerialPort, System.Management for the WMI
+      Win32_PnPEntity query that surfaces USB descriptions + VID/PID.
+    -->
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -65,6 +65,7 @@ namespace RaceCorProDrive.Pages
                     new HorizontalTabs.Tab { Key = "visual",     Label = "Visual" },
                     new HorizontalTabs.Tab { Key = "commentary", Label = "Commentary" },
                     new HorizontalTabs.Tab { Key = "recording",  Label = "Recording" },
+                    new HorizontalTabs.Tab { Key = "hardware",   Label = "Hardware" },
                     new HorizontalTabs.Tab { Key = "system",     Label = "System" },
                 },
                 SelectedKey = _category,
@@ -133,6 +134,11 @@ namespace RaceCorProDrive.Pages
                         SetHeader("Recording",
                             "Capture, microphones, facecam, output, and the rolling replay buffer.");
                         BuildRecordingSection();
+                        break;
+                    case "hardware":
+                        SetHeader("Hardware",
+                            "Direct Moza serial control. Reads from connected wheelbase, pedals, handbrake, shifter, dashboard, and steering wheel — no Pit House required.");
+                        BuildHardwareSection();
                         break;
                     case "system":
                         SetHeader("System",
