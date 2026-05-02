@@ -82,6 +82,7 @@ namespace RaceCorProDrive.Pages
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
+            UpdateService.Shared.PropertyChanged -= OnUpdateServicePropertyChanged;
             App.MainWindow?.SetTitleBarTabs(null);
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
@@ -115,6 +116,11 @@ namespace RaceCorProDrive.Pages
             LeftColumn.Children.Clear();
             RightColumn.Children.Clear();
             _pendingCards.Clear();
+            // The Updates card subscribes to UpdateService.PropertyChanged
+            // and caches DOM refs. Detach before rebuild so a stale
+            // closure doesn't fire onto orphaned TextBlocks the next
+            // time the System tab is constructed.
+            UpdateService.Shared.PropertyChanged -= OnUpdateServicePropertyChanged;
             _suppressSave = true;
             try
             {
@@ -479,6 +485,11 @@ namespace RaceCorProDrive.Pages
 
         private void BuildSystemSection()
         {
+            // Updates card sits at the top of System — most actionable
+            // thing on this tab. Subscribes to UpdateService so the
+            // status line refreshes when the background poll finishes.
+            AddCard(BuildUpdatesCard());
+
             var launch = new SettingsCard { Title = "Launch", Caption = "When the host and HUD start." };
             launch.AddRow(MakeToggleRow("Open this app when I sign in to Windows",
                 "Adds a startup entry so the dashboard is ready before you start a session.",
@@ -530,6 +541,174 @@ namespace RaceCorProDrive.Pages
                     () => _settings.AgentKey ?? "",
                     v => _settings.AgentKey = v)));
             AddCard(connection);
+        }
+
+        // ── Updates card ─────────────────────────────────────────
+        //
+        // Reads UpdateService.Shared. Three states the status line can
+        // show:
+        //   "Checking…"        — IsChecking
+        //   "vX.Y.Z available" — UpdateAvailable, install button surfaced
+        //   "Up to date"       — !UpdateAvailable, last-checked stamp
+        //
+        // ErrorMessage takes precedence (red) when set.
+        //
+        // Subscribes to UpdateService.PropertyChanged so the row
+        // re-renders when a background poll lands. The page rebuilds
+        // its whole card list when the user clicks a tab anyway, but
+        // the System tab can be live-open for a long time so we want
+        // it to refresh in place.
+        private TextBlock? _updateStatusText;
+        private TextBlock? _updateLatestText;
+        private Button? _updateInstallBtn;
+        private ProgressBar? _updateProgress;
+
+        private SettingsCard BuildUpdatesCard()
+        {
+            var svc = UpdateService.Shared;
+            var card = new SettingsCard
+            {
+                Title = "Updates",
+                Caption = "RaceCor Pro Drive checks GitHub for new releases on launch and once an hour.",
+            };
+
+            // Current version (read-only).
+            card.AddRow(MakeStatusRow("Current version", "v" + svc.CurrentVersion, isWarning: false));
+
+            // Latest version + status (mutable). Cache the TextBlocks
+            // so the PropertyChanged handler can refresh in place.
+            _updateLatestText = new TextBlock
+            {
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+                TextWrapping = TextWrapping.Wrap,
+            };
+            card.AddRow(MakeRow("Latest version", null, _updateLatestText));
+
+            _updateStatusText = new TextBlock
+            {
+                FontSize = 11,
+                Foreground = (Brush)Application.Current.Resources["TextDimBrush"],
+                TextWrapping = TextWrapping.Wrap,
+            };
+            card.AddRow(MakeRow("Status", null, _updateStatusText));
+
+            _updateProgress = new ProgressBar
+            {
+                Minimum = 0,
+                Maximum = 100,
+                Height = 4,
+                Visibility = Visibility.Collapsed,
+            };
+            card.AddRow(_updateProgress);
+
+            // Auto-update toggle. Persists to AppSettings (NOT the
+            // overlay-settings.json) — this is a per-machine host
+            // preference, not a HUD render setting.
+            var autoToggle = new ToggleSwitch
+            {
+                IsOn = svc.AutoUpdateEnabled,
+                OnContent = "On",
+                OffContent = "Off",
+            };
+            autoToggle.Toggled += (_, __) =>
+            {
+                if (_suppressSave) return;
+                svc.AutoUpdateEnabled = autoToggle.IsOn;
+            };
+            card.AddRow(MakeRow("Install updates automatically",
+                "When a new release is available, download and run the installer in the background.",
+                autoToggle));
+
+            // Action buttons.
+            var checkBtn = new Button
+            {
+                Content = "Check now",
+                Margin = new Thickness(0, 8, 8, 0),
+            };
+            checkBtn.Click += async (_, __) => await svc.CheckNowAsync();
+
+            _updateInstallBtn = new Button
+            {
+                Content = "Download & install",
+                Margin = new Thickness(0, 8, 0, 0),
+                Visibility = Visibility.Collapsed,
+            };
+            _updateInstallBtn.Click += async (_, __) => await svc.InstallAsync();
+
+            var btnRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 0,
+            };
+            btnRow.Children.Add(checkBtn);
+            btnRow.Children.Add(_updateInstallBtn);
+            card.AddRow(btnRow);
+
+            // Initial render + subscribe.
+            ApplyUpdateState();
+            svc.PropertyChanged += OnUpdateServicePropertyChanged;
+
+            return card;
+        }
+
+        private void OnUpdateServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // UpdateService raises from worker threads (timer + HTTP
+            // continuations) — marshal back onto the UI dispatcher.
+            DispatcherQueue.TryEnqueue(ApplyUpdateState);
+        }
+
+        private void ApplyUpdateState()
+        {
+            var svc = UpdateService.Shared;
+            if (_updateLatestText is null || _updateStatusText is null
+                || _updateInstallBtn is null || _updateProgress is null) return;
+
+            _updateLatestText.Text = string.IsNullOrEmpty(svc.LatestVersion)
+                ? "—"
+                : "v" + svc.LatestVersion;
+
+            string status;
+            bool warn = false;
+            if (!string.IsNullOrEmpty(svc.ErrorMessage))
+            {
+                status = svc.ErrorMessage!;
+                warn = true;
+            }
+            else if (svc.IsDownloading)
+            {
+                status = $"Downloading… {svc.DownloadPercent}%";
+            }
+            else if (svc.IsChecking)
+            {
+                status = "Checking GitHub…";
+            }
+            else if (svc.UpdateAvailable)
+            {
+                status = $"v{svc.LatestVersion} is available.";
+            }
+            else if (svc.LastCheckedAt is { } when_)
+            {
+                status = $"Up to date. Last checked {when_.ToLocalTime():t}.";
+            }
+            else
+            {
+                status = "Not yet checked.";
+            }
+            _updateStatusText.Text = status;
+            _updateStatusText.Foreground = warn
+                ? (Brush)Application.Current.Resources["BrandRedBrush"]
+                : (Brush)Application.Current.Resources["TextDimBrush"];
+
+            _updateInstallBtn.Visibility = svc.UpdateAvailable && !svc.IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            _updateProgress.Value = svc.DownloadPercent;
+            _updateProgress.Visibility = svc.IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         // ── Two-column card layout ───────────────────────────────────

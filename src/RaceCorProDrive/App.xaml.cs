@@ -86,6 +86,14 @@ namespace RaceCorProDrive
                 Services.Moza.MozaService.Shared.Start();
                 BootTrace("MozaService started");
 
+                // Auto-updater. Polls GitHub Releases on launch and
+                // hourly. If the user has auto-update enabled (default
+                // true) and a new version is available, downloads +
+                // launches the installer in the background. Otherwise
+                // surfaces the new version in Settings → System.
+                Services.UpdateService.Shared.Start();
+                BootTrace("UpdateService started");
+
                 // Process any URI captured during initial launch (rare; usually
                 // OAuth comes back via redirected activation while we're already
                 // running — see HandleProtocolActivation).
