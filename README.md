@@ -2,7 +2,7 @@
 
 Native Windows desktop app for [RaceCor Pro Drive](https://prodrive.racecor.io). WinUI 3 + C# .NET 8.
 
-The CI release pipeline also bundles the SimHub plugin and the Electron HUD overlay (built from sibling repos) into a single installer — see [`installer/`](installer/).
+The CI release pipeline produces a single Inno Setup installer that bundles this desktop app **plus the Electron HUD overlay** (built from the [`prodrive-overlay`](https://github.com/k10-motorsports/prodrive-overlay) sibling repo). The installer does **not** bundle the SimHub plugin — that's a separate install from [`prodrive-plugin`](https://github.com/k10-motorsports/prodrive-plugin). See [`installer/`](installer/).
 
 ## Repo layout
 
@@ -16,19 +16,32 @@ prodrive-windows/
 ├── next-steps.md           v1+ roadmap
 ├── LICENSE
 ├── README.md               This file
-└── CLAUDE.md
+└── CLAUDE.md               Pointer to canonical agents/ docs
 ```
 
 Cross-repo agent docs live under [`agents/`](agents/) (git submodule).
 
-## v0 features
+## What the app does
 
-- OAuth 2.0 PKCE sign-in with Discord
-- Secure token storage (Windows Credential Manager / `PasswordVault`)
-- Dashboard with stat tiles
-- Paginated race sessions list with filtering
-- Session detail view with lap telemetry
-- Dark theme (v1 will add accent-color integration)
+A first-class Pro Drive desktop client — far beyond the original "shell + installer" framing. Nine pages, all behind Discord OAuth:
+
+| Page | Purpose |
+|------|---------|
+| **Login** | OAuth 2.0 PKCE sign-in with Discord (browser handoff via custom protocol handler) |
+| **Dashboard** | Stat tiles, HUD-status indicator, "launch overlay" FAB |
+| **Sessions** | Paginated race list with category filtering, fetched from `prodrive.racecor.io/api/v1/sessions` |
+| **SessionDetail** | Session header, lap telemetry, AI debrief from server |
+| **Library** | Local `.rcpdv` race-bundle browser (MP4 + telemetry sidecar). Click in, scrub MP4 with telemetry overlay |
+| **Editor** | MP4 viewer with bundle metadata overlay (clip prep — early stage) |
+| **Settings** | 5 tabs: Visual, Commentary, Recording, **Hardware** (Moza wheel/pedal/shifter/handbrake), System |
+| **PlaceholderPage** | Stubs for Moments, Tracks, Cars, DNA, When, Safety, Composure, Debrief |
+
+Cross-cutting behaviors:
+
+- **iRacing detector** (`Services/IRacingDetector.cs`) polls `Local\IRSDKMemMapFileName` every 5s; auto-launches the bundled overlay (`Overlay\RaceCorOverlay.exe`) when iRacing starts
+- **Plugin status** — Dashboard polls `http://localhost:8889/racecor-io-pro-drive/` for the live HUD-status indicator
+- **LAN sharing via mDNS/Bonjour** — advertises `prodrive-share._tcp` (Zeroconf NuGet) so other Pro Drive desktop apps on the same LAN can discover and pull race bundles
+- **Shared overlay settings** — host writes `%APPDATA%\RaceCor.io\overlay-settings.json`; the bundled overlay reads it
 
 ## Requirements
 
@@ -78,13 +91,18 @@ explorer racecor-prodrive://auth?code=test&state=test
 
 - **Pages** (XAML + code-behind): UI layout and user events
 - **ViewModels**: simple classes managing page state (`ObservableCollection`, etc.)
-- **Services**: `AuthService`, `ApiClient`, `TokenStore` (shared across pages)
+- **Services**: `AuthService`, `ApiClient`, `TokenStore`, `IRacingDetector`, `OverlayLauncher`, `BundleReader`, `LibraryService`, plus 12 services in `Services/Moza/` for hardware
 
 ### Key services
 
 - **AuthService** — orchestrates OAuth 2.0 PKCE flow (codeverifier/challenge, browser auth, callback via protocol handler, code → token exchange, auto-refresh on 401)
 - **TokenStore** — wraps Windows `PasswordVault` for OS-level encrypted token persistence
 - **ApiClient** — HTTP wrapper that auto-attaches `Authorization: Bearer`, handles JSON, retries on 401 with refresh
+- **IRacingDetector** — polls iRacing SDK shared-memory existence; raises events for OverlayLauncher
+- **OverlayLauncher** — spawns `Overlay\RaceCorOverlay.exe` (path relative to host binary)
+- **BundleReader / LibraryService** — read `.rcpdv` race bundles for the Library + Editor pages
+- **Services/Moza/** — 12 services for Moza wheel / pedal / shifter / handbrake configuration via `System.IO.Ports` + `System.Management`
+- **BonjourBrowser / LanSender** — Zeroconf-based LAN sharing of bundles
 
 ### Design system
 
@@ -107,27 +125,20 @@ Endpoints implemented:
 - `GET /api/v1/me` — current user profile
 - `GET /api/v1/sessions?limit=50&offset=0&category=all` — paginated sessions
 - `GET /api/v1/sessions/:id` — session detail + laps
-- `GET /api/v1/dashboard` — dashboard stats (stub)
-
-## Pages
-
-| Page | Purpose |
-|------|---------|
-| **LoginPage** | Discord sign-in button |
-| **DashboardPage** | Stat tiles, recent sessions |
-| **SessionsPage** | Filterable, paginated race list |
-| **SessionDetailPage** | Session header, lap telemetry |
-| **PlaceholderPage** | Reusable stub for Moments / Tracks / Cars / DNA / When / Safety / Composure / Debrief / Settings |
+- `GET /api/v1/dashboard?tz=...` — dashboard aggregates
+- `GET /api/v1/tokens/native?format=cs` — design tokens for native rendering
 
 ## Building for release
 
-The combined installer (host + Electron HUD + SimHub plugin) is built by the [`installer/`](installer/) tooling. CI fires on a `v*` tag push — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
+The combined installer (host + Electron HUD overlay) is built by the [`installer/`](installer/) tooling. CI fires on a `v*` tag push — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 Local installer build:
 
 ```powershell
 pwsh -File installer/build.ps1
 ```
+
+The installer's PowerShell script defaults `$OverlayRepo` to `../../prodrive-overlay/`. Override with the env var `RACECOR_OVERLAY_PATH` if your sibling checkout is elsewhere.
 
 ### Unpackaged → MSIX (Microsoft Store)
 
@@ -146,6 +157,10 @@ pwsh -File installer/build.ps1
 
 Bundle identifier: `racing.k10motorsports.prodrive.racecor.win`.
 
+## Release wave
+
+This repo is **Wave 2** of the six-repo lockstep release (alongside macOS / iOS / tvOS). Triggered after **Wave 1** (plugin + overlay) publishes their GitHub releases — the installer's build script downloads the latest plugin + overlay artifacts at release time. See the orchestrator at `agents/.claude/commands/release.md`.
+
 ## Troubleshooting
 
 ### "Cannot find type name" errors
@@ -160,13 +175,19 @@ Verify `HKEY_CURRENT_USER\Software\Classes\racecor-prodrive` in `regedit`. The `
 ### XAML binding failures
 Confirm `DesignSystem.xaml` is merged in `App.xaml.Resources` and that element names match `x:Name` in code-behind.
 
+### Overlay doesn't auto-launch with iRacing
+- Check that `Overlay\RaceCorOverlay.exe` exists in the install directory. (If you ran from source, the overlay isn't there — install the packaged build to test the full launcher chain.)
+- The detector polls every 5s, so iRacing may need to be running for a moment before the overlay spawns.
+- Manual launch from Dashboard → "Launch overlay" works regardless.
+
 ## Known limitations (v0)
 
 - Unpackaged — no Store integration yet
-- `/api/v1/dashboard` is a stub
+- Some `/api/v1/dashboard` aggregates are stubs server-side
 - 9 nav items are `PlaceholderPage` (Moments, DNA, When, etc.)
 - Dark theme only — v1 will add light mode + accent-color integration
 - No offline mode
+- LAN sharing requires both peers on the same broadcast domain (no VPN traversal)
 
 ## Next steps
 
