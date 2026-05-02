@@ -62,46 +62,14 @@ namespace RaceCorProDrive.Pages
             CategoryTabs.SelectedKey = _category;
             BuildCategory();
 
-            // App-level rail wiring. Same pattern as DashboardPage —
-            // user identity feeds the profile flyout, tapping a
-            // destination navigates out of Settings, Sign Out hits
-            // the auth shell, and the Settings flyout entry is a
-            // no-op while we're already on this page.
-            AppRail.UserName = App.MainWindow?.CurrentUserDisplayName ?? "User";
-            AppRail.SelectedKey = string.Empty; // no rail destination = Settings
-            AppRail.DestinationSelected += OnRailDestinationSelected;
-            AppRail.SignOutRequested += OnRailSignOutRequested;
-            AppRail.SettingsRequested += OnRailSettingsRequested;
+            // Rail lives in MainWindow chrome — nothing to wire here.
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
-            AppRail.DestinationSelected -= OnRailDestinationSelected;
-            AppRail.SignOutRequested -= OnRailSignOutRequested;
-            AppRail.SettingsRequested -= OnRailSettingsRequested;
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
-        }
-
-        private void OnRailDestinationSelected(object? sender, string destinationKey)
-        {
-            // Any rail destination tap navigates back out to that page
-            // (LeftRail handles its own SelectedKey state internally;
-            // we just route the chosen destination to the shell).
-            App.MainWindow?.NavigateToPage(destinationKey);
-        }
-
-        private void OnRailSignOutRequested(object? sender, EventArgs e)
-        {
-            App.MainWindow?.SignOut();
-        }
-
-        private void OnRailSettingsRequested(object? sender, EventArgs e)
-        {
-            // Already on settings — no-op. Could refresh the form here
-            // if we want to add a "reload from disk" gesture, but the
-            // file watcher handles external changes already.
         }
 
         private void OnSettingsFileChanged(object? sender, OverlaySettings refreshed)
@@ -121,9 +89,17 @@ namespace RaceCorProDrive.Pages
             BuildCategory();
         }
 
+        // Cards are accumulated here during a Build*Section pass so
+        // BuildCategory can balance them across the two columns at the
+        // end (rather than placing each card immediately and ending up
+        // with a long left column + short right column).
+        private readonly List<SettingsCard> _pendingCards = new();
+
         private void BuildCategory()
         {
-            CardsHost.Children.Clear();
+            LeftColumn.Children.Clear();
+            RightColumn.Children.Clear();
+            _pendingCards.Clear();
             _suppressSave = true;
             try
             {
@@ -150,6 +126,7 @@ namespace RaceCorProDrive.Pages
                         BuildSystemSection();
                         break;
                 }
+                FlushColumns();
             }
             finally { _suppressSave = false; }
         }
@@ -205,7 +182,7 @@ namespace RaceCorProDrive.Pages
                     new[] { ("minimal", "Minimal"), ("minimal+", "Minimal+"), ("standard", "Standard"), ("rich", "Rich") },
                     () => _settings.VisualPreset ?? "standard",
                     v => _settings.VisualPreset = v)));
-            CardsHost.Children.Add(display);
+            AddCard(display);
 
             var effects = new SettingsCard
             {
@@ -224,7 +201,7 @@ namespace RaceCorProDrive.Pages
                 "Replace the background with pure green for OBS chroma keying.",
                 () => _settings.GreenScreen ?? false,
                 v => _settings.GreenScreen = v));
-            CardsHost.Children.Add(effects);
+            AddCard(effects);
 
             var modules = new SettingsCard
             {
@@ -245,7 +222,7 @@ namespace RaceCorProDrive.Pages
             M("Pit box",     () => _settings.ShowPitBox      ?? true, v => _settings.ShowPitBox = v);
             M("Incidents",   () => _settings.ShowIncidents   ?? true, v => _settings.ShowIncidents = v);
             M("Spotter",     () => _settings.ShowSpotter     ?? true, v => _settings.ShowSpotter = v);
-            CardsHost.Children.Add(modules);
+            AddCard(modules);
 
             var leaderboard = new SettingsCard
             {
@@ -265,7 +242,7 @@ namespace RaceCorProDrive.Pages
                 "Stretch rows vertically to fill available space.",
                 () => _settings.LbExpandToFill ?? false,
                 v => _settings.LbExpandToFill = v));
-            CardsHost.Children.Add(leaderboard);
+            AddCard(leaderboard);
 
             var branding = new SettingsCard
             {
@@ -282,7 +259,7 @@ namespace RaceCorProDrive.Pages
                 MakeTextBox(
                     () => _settings.LogoSubtitle ?? "",
                     v => _settings.LogoSubtitle = v)));
-            CardsHost.Children.Add(branding);
+            AddCard(branding);
         }
 
         // ── Commentary (combined commentary + coach) ─────────────────
@@ -318,7 +295,7 @@ namespace RaceCorProDrive.Pages
                 "Cycle synthetic prompts so you can preview the engine without driving.",
                 () => _settings.CommentaryDemoMode ?? false,
                 v => _settings.CommentaryDemoMode = v));
-            CardsHost.Children.Add(prompts);
+            AddCard(prompts);
 
             var topics = new SettingsCard
             {
@@ -337,7 +314,7 @@ namespace RaceCorProDrive.Pages
             topics.AddRow(MakeToggleRow("Behavior", null,
                 () => _settings.CommentaryCatBehavior ?? true,
                 v => _settings.CommentaryCatBehavior = v));
-            CardsHost.Children.Add(topics);
+            AddCard(topics);
 
             var profile = new SettingsCard
             {
@@ -360,7 +337,7 @@ namespace RaceCorProDrive.Pages
                 "Coach can call back to past sessions and trends.",
                 () => _settings.CommentaryCatRacingExperience ?? true,
                 v => _settings.CommentaryCatRacingExperience = v));
-            CardsHost.Children.Add(profile);
+            AddCard(profile);
 
             var voice = new SettingsCard
             {
@@ -383,7 +360,7 @@ namespace RaceCorProDrive.Pages
                     new[] { ("terse", "Terse"), ("balanced", "Balanced"), ("rich", "Rich") },
                     () => _settings.CoachDepth ?? "balanced",
                     v => _settings.CoachDepth = v)));
-            CardsHost.Children.Add(voice);
+            AddCard(voice);
         }
 
         // ── Recording ────────────────────────────────────────────────
@@ -404,7 +381,7 @@ namespace RaceCorProDrive.Pages
                 "End the recording when you enter the pit lane.",
                 () => _settings.RecordingAutoStopOnPit ?? false,
                 v => _settings.RecordingAutoStopOnPit = v));
-            CardsHost.Children.Add(capture);
+            AddCard(capture);
 
             var audio = new SettingsCard { Title = "Audio", Caption = "Microphone + system audio sources." };
             audio.AddRow(MakeToggleRow("Record microphone", null,
@@ -426,7 +403,7 @@ namespace RaceCorProDrive.Pages
                 () => (_settings.RecordingSystemVolume ?? 1.0) * 100,
                 v => _settings.RecordingSystemVolume = v / 100,
                 "0", "%"));
-            CardsHost.Children.Add(audio);
+            AddCard(audio);
 
             var facecam = new SettingsCard { Title = "Facecam", Caption = "Optional in-frame webcam." };
             facecam.AddRow(MakeRow("Camera", null,
@@ -447,7 +424,7 @@ namespace RaceCorProDrive.Pages
                     },
                     () => _settings.RecordingFacecamPos ?? "bottom-right",
                     v => _settings.RecordingFacecamPos = v)));
-            CardsHost.Children.Add(facecam);
+            AddCard(facecam);
 
             var output = new SettingsCard { Title = "Output", Caption = "File format + encoder selection." };
             output.AddRow(MakeRow("Format", null,
@@ -464,7 +441,7 @@ namespace RaceCorProDrive.Pages
                 "Save space by removing the raw capture once the encoded file lands.",
                 () => _settings.RecordingDeleteSource ?? true,
                 v => _settings.RecordingDeleteSource = v));
-            CardsHost.Children.Add(output);
+            AddCard(output);
 
             var replay = new SettingsCard { Title = "Replay buffer", Caption = "Always-on rolling capture for save-after-the-fact clips." };
             replay.AddRow(MakeToggleRow("Enable replay buffer", null,
@@ -479,7 +456,7 @@ namespace RaceCorProDrive.Pages
                     _settings.ReplayBufferDuration = i.ToString(); // mirror to web schema
                 },
                 "0", "s"));
-            CardsHost.Children.Add(replay);
+            AddCard(replay);
         }
 
         // ── System ───────────────────────────────────────────────────
@@ -500,13 +477,13 @@ namespace RaceCorProDrive.Pages
                 "Show only the K10 logo until telemetry connects.",
                 () => _settings.LogoOnlyStart ?? true,
                 v => _settings.LogoOnlyStart = v));
-            CardsHost.Children.Add(launch);
+            AddCard(launch);
 
             var iracing = new SettingsCard { Title = "iRacing", Caption = "Sim-specific behavior." };
             iracing.AddRow(MakeToggleRow("iRacing data sync", null,
                 () => _settings.IracingDataSync ?? true,
                 v => _settings.IracingDataSync = v));
-            CardsHost.Children.Add(iracing);
+            AddCard(iracing);
 
             var hotkeys = new SettingsCard
             {
@@ -516,7 +493,7 @@ namespace RaceCorProDrive.Pages
             hotkeys.AddRow(MakeReadonlyHotkeyRow("Toggle HUD visibility", "Ctrl+Shift+H"));
             hotkeys.AddRow(MakeReadonlyHotkeyRow("Toggle HUD settings mode", "Ctrl+Shift+S"));
             hotkeys.AddRow(MakeReadonlyHotkeyRow("Save replay clip", "Ctrl+Shift+V"));
-            CardsHost.Children.Add(hotkeys);
+            AddCard(hotkeys);
 
             var connection = new SettingsCard { Title = "Connection", Caption = "Where the HUD talks to SimHub + the cloud." };
             connection.AddRow(MakeRow("SimHub plugin URL",
@@ -536,7 +513,50 @@ namespace RaceCorProDrive.Pages
                 MakeTextBox(
                     () => _settings.AgentKey ?? "",
                     v => _settings.AgentKey = v)));
-            CardsHost.Children.Add(connection);
+            AddCard(connection);
+        }
+
+        // ── Two-column card layout ───────────────────────────────────
+        //
+        // Cards accumulate in _pendingCards as each Build*Section runs.
+        // FlushColumns() then walks the list in source order and drops
+        // each card into whichever column is currently shorter (height
+        // estimated from the card's row count). Source order is
+        // preserved within each column, but the two columns end up
+        // roughly balanced vertically — no long-left / stub-right
+        // imbalance the old row-major flow produced.
+        private void AddCard(SettingsCard card)
+        {
+            card.HorizontalAlignment = HorizontalAlignment.Stretch;
+            card.VerticalAlignment = VerticalAlignment.Top;
+            _pendingCards.Add(card);
+        }
+
+        private void FlushColumns()
+        {
+            // Estimated heights: header band (~70pt for title + caption +
+            // top/bottom padding) + per-row band (~52pt for a typical
+            // row with control + caption). These don't have to be exact
+            // — they only need to rank cards by relative height for the
+            // greedy balancer.
+            const double HeaderEstimate = 70.0;
+            const double RowEstimate = 52.0;
+
+            double leftHeight = 0, rightHeight = 0;
+            foreach (var card in _pendingCards)
+            {
+                var estimate = HeaderEstimate + card.RowCount * RowEstimate;
+                if (leftHeight <= rightHeight)
+                {
+                    LeftColumn.Children.Add(card);
+                    leftHeight += estimate;
+                }
+                else
+                {
+                    RightColumn.Children.Add(card);
+                    rightHeight += estimate;
+                }
+            }
         }
 
         // ── Builders (return SettingsRow / SettingsSlider / etc.) ────

@@ -47,6 +47,58 @@ namespace RaceCorProDrive.Auth
         }
 
         /// <summary>
+        /// Rehydrate an existing session at app startup. Reads the
+        /// PasswordVault tokens, refreshes them if they're stale,
+        /// wires the bearer onto the API + calc clients, then loads
+        /// the current user. Returns true if the session is usable.
+        ///
+        /// Without this step <see cref="IsAuthenticated"/> can return
+        /// true (tokens persisted, not expired) while
+        /// <see cref="CurrentUser"/> is still null and the API clients
+        /// have no bearer set — the symptom users see is "logged in"
+        /// shell with empty data and a "User" name in the rail.
+        /// </summary>
+        public async Task<bool> RestoreSessionAsync()
+        {
+            var tokens = _tokenStore.LoadTokens();
+            if (tokens?.AccessToken == null) return false;
+
+            // Refresh proactively if the access token is within 5 minutes
+            // of expiry (or already gone). The refresh endpoint lives at
+            // the same /token URL with grant_type=refresh_token.
+            if (DateTime.UtcNow >= tokens.ExpiresAt.AddMinutes(-5))
+            {
+                if (string.IsNullOrEmpty(tokens.RefreshToken))
+                {
+                    // No refresh token to use — force re-login.
+                    _tokenStore.ClearTokens();
+                    return false;
+                }
+                try
+                {
+                    await RefreshTokenAsync();
+                    tokens = _tokenStore.LoadTokens();
+                    if (tokens?.AccessToken == null) return false;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[AUTH] refresh on restore failed: {ex.Message}");
+                    _tokenStore.ClearTokens();
+                    return false;
+                }
+            }
+
+            // Wire the bearer onto every per-process HTTP surface that
+            // talks to web-api. Both clients need it independently —
+            // ApiClient for /api/v1/* and CalcClient for the calc POSTs.
+            _apiClient.SetAuthToken(tokens.AccessToken);
+            CalcClient.Shared.SetBearerToken(tokens.AccessToken);
+
+            await LoadCurrentUserAsync();
+            return _currentUser != null;
+        }
+
+        /// <summary>
         /// Try the in-app <see cref="WebAuthenticationBroker"/> path
         /// before falling back to the system browser. Returns
         /// <c>true</c> when the broker completes the flow end-to-end

@@ -38,22 +38,19 @@
         and sidebar — same composition as the macOS build.
     -->
 
+    <!-- Background lives in MainWindow now (one livery photo for the
+         whole session). Outer grid wraps the offset content + the
+         absolute-centered ProgressRing so the spinner stays centered
+         on the full window, not on the rail-offset content. -->
     <Grid>
-        <design:ThemedBackgroundControl />
-
-        <Grid>
+        <Grid Margin="72,0,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <components:LeftRail x:Name="LeftRail"
-                                 Grid.Column="0"
-                                 SelectedKey="dashboard" />
-
             <!-- Main column -->
-            <Grid Grid.Column="1">
+            <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <!--
                         Row 0 grew 44 → 76pt: 32pt at the top
@@ -146,7 +143,7 @@
             </Grid>
 
             <components:SidebarTabs x:Name="Sidebar"
-                                    Grid.Column="2" />
+                                    Grid.Column="1" />
         </Grid>
 
         <ProgressRing x:Name="LoadingRing"
@@ -155,41 +152,5 @@
                       Foreground="{StaticResource BrandRedBrush}"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center" />
-
-        <!--
-            Floating launcher for the racing overlay (HUD). Sits at
-            the bottom-left of the dashboard. Click hides this window
-            and spawns the overlay; closing the overlay re-shows the
-            dashboard. Hidden when the overlay binary isn't installed
-            (dev runs without a built HUD next to the host).
-        -->
-        <Button x:Name="OverlayLaunchButton"
-                Click="OnOverlayLaunchClick"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Bottom"
-                Margin="16,0,0,16"
-                Width="56" Height="56"
-                CornerRadius="28"
-                Padding="0"
-                BorderThickness="1"
-                BorderBrush="#3DFFFFFF"
-                Background="{StaticResource BrandRedBrush}"
-                Foreground="White"
-                ToolTipService.ToolTip="Launch racing overlay">
-            <Button.Resources>
-                <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FF5B47" />
-                <SolidColorBrush x:Key="ButtonBackgroundPressed"     Color="#C81E1E" />
-                <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
-                <SolidColorBrush x:Key="ButtonForegroundPressed"     Color="White" />
-                <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#80FFFFFF" />
-                <SolidColorBrush x:Key="ButtonBorderBrushPressed"     Color="#80FFFFFF" />
-            </Button.Resources>
-            <!-- Game/controller glyph from Segoe Fluent Icons. -->
-            <TextBlock FontFamily="Segoe Fluent Icons"
-                       Text="&#xE7FC;"
-                       FontSize="22"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center" />
-        </Button>
     </Grid>
 </Page>

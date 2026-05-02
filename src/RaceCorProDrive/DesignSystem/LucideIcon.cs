@@ -88,5 +88,7 @@ namespace RaceCorProDrive.DesignSystem
         public const string Moments      = "sparkles";
         public const string Races        = "flag";
         public const string Profile      = "user";
+        public const string Settings     = "settings";
+        public const string LaunchHud    = "launcher-option-1-gauge";
     }
 }

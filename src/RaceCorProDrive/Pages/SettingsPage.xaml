@@ -29,24 +29,11 @@
         targets the overlay's 6 anchor zones (TL/TC/TR/BL/BC/BR).
     -->
 
-    <Grid RequestedTheme="Dark">
-        <Grid.ColumnDefinitions>
-            <!-- App-level LeftRail (matches DashboardPage's chrome). -->
-            <ColumnDefinition Width="Auto" />
-            <!-- Content column (tabs + header + cards). -->
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <design:ThemedBackgroundControl Grid.ColumnSpan="2" />
-
-        <!-- App-level navigation. SelectedKey=null because no rail
-             destination represents Settings — it's reached from the
-             profile flyout. Tapping a rail destination from here
-             navigates back out via App.MainWindow.NavigateToPage. -->
-        <components:LeftRail x:Name="AppRail"
-                             Grid.Column="0" />
-
-        <Grid Grid.Column="1">
+    <!-- Background + LeftRail live in MainWindow chrome (one livery
+         photo for the whole session, rail outside the navigated frame
+         so page transitions don't slide it). This page just provides
+         the content column, offset 72pt to clear the rail. -->
+    <Grid RequestedTheme="Dark" Margin="72,0,0,0">
             <Grid.RowDefinitions>
                 <!-- Top 32pt = drag region; tabs sit in the bottom 44pt. -->
                 <RowDefinition Height="76" />
@@ -108,15 +95,34 @@
                                Text="" />
                 </Grid>
 
+                <!-- Two-column card layout. Each column is its own
+                     StackPanel so cards flow vertically within their
+                     column (column-major). Code-behind packs each card
+                     into whichever column is currently shorter
+                     (estimated from row count) so the two columns end
+                     up roughly balanced in height. -->
                 <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="CardsHost"
-                                Orientation="Vertical"
-                                Spacing="14"
-                                MaxWidth="780"
-                                HorizontalAlignment="Left" />
+                    <Grid x:Name="CardsHost"
+                          ColumnSpacing="14"
+                          MaxWidth="1280"
+                          HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel x:Name="LeftColumn"
+                                    Grid.Column="0"
+                                    Orientation="Vertical"
+                                    Spacing="14"
+                                    VerticalAlignment="Top" />
+                        <StackPanel x:Name="RightColumn"
+                                    Grid.Column="1"
+                                    Orientation="Vertical"
+                                    Spacing="14"
+                                    VerticalAlignment="Top" />
+                    </Grid>
                 </ScrollViewer>
             </Grid>
-        </Grid>
     </Grid>
 </Page>

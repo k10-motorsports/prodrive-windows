@@ -90,6 +90,13 @@ namespace RaceCorProDrive.DesignSystem.Components
 
         public void ClearRows() => _bodyHost.Children.Clear();
 
+        /// <summary>
+        /// Number of rows currently stacked in the body. Used by the
+        /// SettingsPage's two-column layout to estimate a card's height
+        /// before render so the columns can be balanced vertically.
+        /// </summary>
+        public int RowCount => _bodyHost.Children.Count;
+
         private void Apply()
         {
             _titleText.Text = (Title ?? string.Empty).ToUpperInvariant();
