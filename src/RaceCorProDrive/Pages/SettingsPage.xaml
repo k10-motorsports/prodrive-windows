@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:design="using:RaceCorProDrive.DesignSystem"
+    xmlns:components="using:RaceCorProDrive.DesignSystem.Components"
     Loaded="OnLoaded"
     Unloaded="OnUnloaded">
     <!--
@@ -29,17 +30,28 @@
 
     <Grid RequestedTheme="Dark">
         <Grid.ColumnDefinitions>
+            <!-- App-level LeftRail (matches DashboardPage's chrome). -->
             <ColumnDefinition Width="Auto" />
+            <!-- Settings categories nav. -->
+            <ColumnDefinition Width="Auto" />
+            <!-- Section content. -->
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <design:ThemedBackgroundControl />
+        <design:ThemedBackgroundControl Grid.ColumnSpan="3" />
 
-        <!-- Category nav. Pinned to a 220pt left rail so the right
-             pane has predictable width. -->
+        <!-- App-level navigation. SelectedKey=null because no rail
+             destination represents Settings — it's reached from the
+             profile flyout. Tapping a rail destination from here
+             navigates back out via App.MainWindow.NavigateToPage. -->
+        <components:LeftRail x:Name="AppRail"
+                             Grid.Column="0" />
+
+        <!-- Settings category nav. Pinned to a 220pt left rail so
+             the content pane has predictable width. -->
         <NavigationView
             x:Name="CategoryNav"
-            Grid.Column="0"
+            Grid.Column="1"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
             IsPaneToggleButtonVisible="False"
@@ -57,9 +69,9 @@
             </NavigationView.MenuItems>
         </NavigationView>
 
-        <!-- Right pane: header (title + caption + save status) +
+        <!-- Content pane: header (title + caption + save status) +
              scrollable card list. -->
-        <Grid Grid.Column="1" Padding="40,32,40,24">
+        <Grid Grid.Column="2" Padding="40,32,40,24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />

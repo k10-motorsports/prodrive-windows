@@ -61,6 +61,7 @@ namespace RaceCorProDrive.Pages
             // data + callback.
             LeftRail.UserName = App.MainWindow?.CurrentUserDisplayName ?? "User";
             LeftRail.SignOutRequested += OnRailSignOutRequested;
+            LeftRail.SettingsRequested += OnRailSettingsRequested;
 
             // Overlay launcher availability — hide the FAB if the HUD
             // binary isn't bundled (dev runs where Overlay\ wasn't
@@ -74,6 +75,11 @@ namespace RaceCorProDrive.Pages
         private void OnRailSignOutRequested(object? sender, EventArgs e)
         {
             App.MainWindow?.SignOut();
+        }
+
+        private void OnRailSettingsRequested(object? sender, EventArgs e)
+        {
+            App.MainWindow?.NavigateToPage("settings");
         }
 
         // ── Dashboard filter buttons (Race/Practice + License) ─────
@@ -124,6 +130,7 @@ namespace RaceCorProDrive.Pages
         {
             DashboardPoller.Shared.PropertyChanged -= OnPollerChanged;
             LeftRail.SignOutRequested -= OnRailSignOutRequested;
+            LeftRail.SettingsRequested -= OnRailSettingsRequested;
             OverlayLauncher.Shared.PropertyChanged -= OnOverlayStateChanged;
             // Keep polling alive even when this Page is unloaded so
             // notifications + cached state survive nav transitions.

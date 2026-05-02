@@ -51,13 +51,47 @@ namespace RaceCorProDrive.Pages
 
             CategoryNav.SelectedItem = CategoryNav.MenuItems[0];
             BuildCategory();
+
+            // App-level rail wiring. Same pattern as DashboardPage —
+            // user identity feeds the profile flyout, tapping a
+            // destination navigates out of Settings, Sign Out hits
+            // the auth shell, and the Settings flyout entry is a
+            // no-op while we're already on this page.
+            AppRail.UserName = App.MainWindow?.CurrentUserDisplayName ?? "User";
+            AppRail.SelectedKey = string.Empty; // no rail destination = Settings
+            AppRail.DestinationSelected += OnRailDestinationSelected;
+            AppRail.SignOutRequested += OnRailSignOutRequested;
+            AppRail.SettingsRequested += OnRailSettingsRequested;
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
+            AppRail.DestinationSelected -= OnRailDestinationSelected;
+            AppRail.SignOutRequested -= OnRailSignOutRequested;
+            AppRail.SettingsRequested -= OnRailSettingsRequested;
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
+        }
+
+        private void OnRailDestinationSelected(object? sender, string destinationKey)
+        {
+            // Any rail destination tap navigates back out to that page
+            // (LeftRail handles its own SelectedKey state internally;
+            // we just route the chosen destination to the shell).
+            App.MainWindow?.NavigateToPage(destinationKey);
+        }
+
+        private void OnRailSignOutRequested(object? sender, EventArgs e)
+        {
+            App.MainWindow?.SignOut();
+        }
+
+        private void OnRailSettingsRequested(object? sender, EventArgs e)
+        {
+            // Already on settings — no-op. Could refresh the form here
+            // if we want to add a "reload from disk" gesture, but the
+            // file watcher handles external changes already.
         }
 
         private void OnSettingsFileChanged(object? sender, OverlaySettings refreshed)
