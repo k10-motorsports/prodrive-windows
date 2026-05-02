@@ -36,6 +36,11 @@ namespace RaceCorProDrive.Pages
         private bool _suppressSave;
         private DispatcherTimer? _saveStatusTimer;
 
+        // Category tab strip — lives in MainWindow's titlebar slot
+        // while this page is loaded. Built in OnLoaded, cleared from
+        // the slot in OnUnloaded.
+        private HorizontalTabs? _categoryTabs;
+
         public SettingsPage()
         {
             this.InitializeComponent();
@@ -49,25 +54,34 @@ namespace RaceCorProDrive.Pages
             OverlaySettingsService.Shared.Changed += OnSettingsFileChanged;
             OverlaySettingsService.Shared.StartWatching();
 
-            // Initialize the horizontal tab strip. Same key set the
-            // old NavigationView used so BuildCategory's switch
-            // statement keeps working unchanged.
-            CategoryTabs.Tabs = new[]
+            // Build the horizontal tab strip and push it into the
+            // window-level titlebar slot. Same key set the old
+            // NavigationView used so BuildCategory's switch statement
+            // keeps working unchanged.
+            _categoryTabs = new HorizontalTabs
             {
-                new HorizontalTabs.Tab { Key = "visual",     Label = "Visual" },
-                new HorizontalTabs.Tab { Key = "commentary", Label = "Commentary" },
-                new HorizontalTabs.Tab { Key = "recording",  Label = "Recording" },
-                new HorizontalTabs.Tab { Key = "system",     Label = "System" },
+                Tabs = new[]
+                {
+                    new HorizontalTabs.Tab { Key = "visual",     Label = "Visual" },
+                    new HorizontalTabs.Tab { Key = "commentary", Label = "Commentary" },
+                    new HorizontalTabs.Tab { Key = "recording",  Label = "Recording" },
+                    new HorizontalTabs.Tab { Key = "system",     Label = "System" },
+                },
+                SelectedKey = _category,
             };
-            CategoryTabs.SelectedKey = _category;
-            BuildCategory();
+            _categoryTabs.SelectionChanged += OnCategoryTabChanged;
+            App.MainWindow?.SetTitleBarTabs(_categoryTabs);
+            // No filter widgets on this page — clear the slot in case
+            // the previous page (e.g. dashboard) left filters there.
+            App.MainWindow?.SetTitleBarFilters(null);
 
-            // Rail lives in MainWindow chrome — nothing to wire here.
+            BuildCategory();
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
+            App.MainWindow?.SetTitleBarTabs(null);
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
         }

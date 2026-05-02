@@ -47,15 +47,41 @@
         <!-- Pre-auth: LoginPage rendered full-window. -->
         <Frame x:Name="AuthFrame" Loaded="OnAuthFrameLoaded" />
 
-        <!-- Invisible drag region floating on top of the page's top
-             32pt. SetTitleBar() in the code-behind hands this to the
-             system as the "title bar" — clicks on blank areas drag
-             the window, clicks on interactive children pass through. -->
-        <Grid x:Name="AppTitleBar" Height="32" Background="Transparent" VerticalAlignment="Top">
+        <!-- Drag region floating at the top of the window. SetTitleBar()
+             in the code-behind hands this to the system as the "title
+             bar" — interactive children get clicks normally; only empty
+             space drags. The titlebar is now 44pt tall to host page
+             tabs (left of the system caption buttons) and dashboard
+             filters (immediately left of the caption buttons). Pages
+             push their tabs/filters into TitleBarTabsHost / TitleBarFiltersHost
+             via MainWindow.SetTitleBarTabs / SetTitleBarFilters. -->
+        <Grid x:Name="AppTitleBar" Height="44" Background="Transparent" VerticalAlignment="Top">
             <Grid.ColumnDefinitions>
+                <!-- Reserved for the LeftRail logo/column (rail floats
+                     at HorizontalAlignment=Left, Width=72). -->
+                <ColumnDefinition Width="72" />
+                <!-- Tabs slot — fills remaining width after filters
+                     and caption buttons. -->
                 <ColumnDefinition Width="*" />
+                <!-- Filters slot — Auto so a page with no filters
+                     collapses cleanly. -->
+                <ColumnDefinition Width="Auto" />
+                <!-- 140pt reservation for system min/max/close buttons.
+                     Kept explicit so tabs/filters never run under them. -->
                 <ColumnDefinition Width="140" />
             </Grid.ColumnDefinitions>
+
+            <ContentControl x:Name="TitleBarTabsHost"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Left"
+                            Margin="20,0,0,0" />
+
+            <ContentControl x:Name="TitleBarFiltersHost"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Margin="0,0,12,0" />
         </Grid>
     </Grid>
 </Window>

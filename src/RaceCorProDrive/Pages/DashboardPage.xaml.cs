@@ -7,11 +7,13 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using RaceCorProDrive.Api;
 using RaceCorProDrive.DesignSystem;
 using RaceCorProDrive.DesignSystem.Components;
 using RaceCorProDrive.Services;
 using RaceCorProDrive.Support;
+using Windows.UI;
 using Panel = RaceCorProDrive.DesignSystem.Components.Panel;
 
 namespace RaceCorProDrive.Pages
@@ -39,6 +41,15 @@ namespace RaceCorProDrive.Pages
         // the When-profile hasn't shifted.
         private int? _lastFetchedProfileKey;
 
+        // Title-bar widgets owned by this page — built in OnLoaded,
+        // pushed into MainWindow's titlebar slots so they sit in the
+        // same strip as the system caption buttons. Held here so
+        // UpdateForCurrentSnapshot can read TabsBar.Selected and
+        // UpdateFilterButtonLabels can mutate the buttons' Content.
+        private DashboardTabs? TabsBar;
+        private DropDownButton? ContextFilterButton;
+        private DropDownButton? LicenseFilterButton;
+
         public DashboardPage()
         {
             this.InitializeComponent();
@@ -46,6 +57,8 @@ namespace RaceCorProDrive.Pages
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
+            BuildTitleBarWidgets();
+
             DashboardPoller.Shared.PropertyChanged += OnPollerChanged;
             DashboardPoller.Shared.Start();
             await ThemeStore.Shared.RefreshAsync();
@@ -54,6 +67,80 @@ namespace RaceCorProDrive.Pages
             // — first paint shouldn't blink-default to "Races" if the
             // user previously chose Practice.
             UpdateFilterButtonLabels();
+        }
+
+        // ── Title-bar widget construction ──────────────────────────
+        //
+        // DashboardTabs + the two filter DropDownButtons used to live
+        // in the page XAML in a 76pt row. They moved into MainWindow's
+        // 44pt titlebar so the chrome reads as one continuous strip.
+        // The page still owns the controls (events + state belong to
+        // the page); MainWindow just provides the parent ContentControl
+        // slots.
+        private void BuildTitleBarWidgets()
+        {
+            TabsBar = new DashboardTabs();
+            TabsBar.SelectionChanged += OnTabChanged;
+
+            var filtersPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+            // Per-state brush overrides for the themed
+            // AppDropDownButtonStyle. These used to sit in
+            // DashboardPage.Page.Resources but the buttons live in
+            // MainWindow chrome now — putting the overrides on the
+            // filter container's Resources keeps them inheriting via
+            // the same StaticResource lookup the style template
+            // expects without polluting global app resources.
+            filtersPanel.Resources["ButtonBackgroundPointerOver"]  = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
+            filtersPanel.Resources["ButtonBackgroundPressed"]      = new SolidColorBrush(Color.FromArgb(0x0D, 0xFF, 0xFF, 0xFF));
+            filtersPanel.Resources["ButtonBackgroundDisabled"]     = new SolidColorBrush(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF));
+            filtersPanel.Resources["ButtonForegroundPointerOver"]  = (Brush)Application.Current.Resources["TextPrimaryBrush"];
+            filtersPanel.Resources["ButtonForegroundPressed"]      = (Brush)Application.Current.Resources["TextPrimaryBrush"];
+            filtersPanel.Resources["ButtonBorderBrushPointerOver"] = new SolidColorBrush(Color.FromArgb(0x3D, 0xFF, 0xFF, 0xFF));
+            filtersPanel.Resources["ButtonBorderBrushPressed"]     = (Brush)Application.Current.Resources["BrandRedBrush"];
+
+            ContextFilterButton = MakeDropDown(new[]
+            {
+                ("Races",     (Action)(() => ApplyContext(DashboardContext.Race))),
+                ("Practices", (Action)(() => ApplyContext(DashboardContext.Practice))),
+            });
+            LicenseFilterButton = MakeDropDown(new[]
+            {
+                ("All Licenses", (Action)(() => ApplyLicense(DashboardLicense.All))),
+                ("Sports Car",   (Action)(() => ApplyLicense(DashboardLicense.Road))),
+                ("Oval",         (Action)(() => ApplyLicense(DashboardLicense.Oval))),
+                ("Dirt Road",    (Action)(() => ApplyLicense(DashboardLicense.DirtRoad))),
+                ("Dirt Oval",    (Action)(() => ApplyLicense(DashboardLicense.DirtOval))),
+                ("Formula",      (Action)(() => ApplyLicense(DashboardLicense.Formula))),
+            });
+
+            filtersPanel.Children.Add(ContextFilterButton);
+            filtersPanel.Children.Add(LicenseFilterButton);
+
+            App.MainWindow?.SetTitleBarTabs(TabsBar);
+            App.MainWindow?.SetTitleBarFilters(filtersPanel);
+        }
+
+        private static DropDownButton MakeDropDown(IEnumerable<(string label, Action onClick)> items)
+        {
+            var btn = new DropDownButton
+            {
+                Style = (Microsoft.UI.Xaml.Style)Application.Current.Resources["AppDropDownButtonStyle"],
+            };
+            var flyout = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
+            foreach (var (label, onClick) in items)
+            {
+                var item = new MenuFlyoutItem { Text = label };
+                item.Click += (_, __) => onClick();
+                flyout.Items.Add(item);
+            }
+            btn.Flyout = flyout;
+            return btn;
         }
 
         // ── Dashboard filter buttons (Race/Practice + License) ─────
@@ -65,6 +152,7 @@ namespace RaceCorProDrive.Pages
 
         private void UpdateFilterButtonLabels()
         {
+            if (ContextFilterButton is null || LicenseFilterButton is null) return;
             var (ctx, lic) = DashboardFilterPrefs.Current();
             ContextFilterButton.Content = ctx.DisplayName();
             LicenseFilterButton.Content = lic.DisplayName();
@@ -90,19 +178,13 @@ namespace RaceCorProDrive.Pages
             DashboardPoller.Shared.Start();
         }
 
-        private void OnContextRaceClick(object sender, RoutedEventArgs e)     => ApplyContext(DashboardContext.Race);
-        private void OnContextPracticeClick(object sender, RoutedEventArgs e) => ApplyContext(DashboardContext.Practice);
-
-        private void OnLicenseAllClick(object sender, RoutedEventArgs e)      => ApplyLicense(DashboardLicense.All);
-        private void OnLicenseRoadClick(object sender, RoutedEventArgs e)     => ApplyLicense(DashboardLicense.Road);
-        private void OnLicenseOvalClick(object sender, RoutedEventArgs e)     => ApplyLicense(DashboardLicense.Oval);
-        private void OnLicenseDirtRoadClick(object sender, RoutedEventArgs e) => ApplyLicense(DashboardLicense.DirtRoad);
-        private void OnLicenseDirtOvalClick(object sender, RoutedEventArgs e) => ApplyLicense(DashboardLicense.DirtOval);
-        private void OnLicenseFormulaClick(object sender, RoutedEventArgs e)  => ApplyLicense(DashboardLicense.Formula);
-
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DashboardPoller.Shared.PropertyChanged -= OnPollerChanged;
+            // Clear the titlebar slots we pushed into MainWindow on
+            // load so the next page's tabs/filters can take over.
+            App.MainWindow?.SetTitleBarTabs(null);
+            App.MainWindow?.SetTitleBarFilters(null);
             // Keep polling alive even when this Page is unloaded so
             // notifications + cached state survive nav transitions.
             // Sign-out flows call Stop() explicitly. Rail wiring lives
@@ -147,7 +229,7 @@ namespace RaceCorProDrive.Pages
                 _ = RefreshRaceNowAsync(dash);
             }
 
-            switch (TabsBar.Selected)
+            switch (TabsBar?.Selected ?? DashboardTabs.Tab.Performance)
             {
                 case DashboardTabs.Tab.Performance:
                     PopulatePerformance(dash);

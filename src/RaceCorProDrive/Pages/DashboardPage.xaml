@@ -8,40 +8,19 @@
     Unloaded="OnUnloaded">
 
     <!--
-        Per-state brush overrides for the themed AppDropDownButtonStyle.
-        WinUI looks these brush keys up via {ThemeResource ...} from
-        within the Button's default ControlTemplate; declaring them as
-        Page.Resources scopes the dark-glass hover/pressed colors to
-        the dashboard's filter buttons without leaking onto every
-        system Button in the app.
-    -->
-    <Page.Resources>
-        <SolidColorBrush x:Key="ButtonBackgroundPointerOver"  Color="#33FFFFFF" />
-        <SolidColorBrush x:Key="ButtonBackgroundPressed"      Color="#0DFFFFFF" />
-        <SolidColorBrush x:Key="ButtonBackgroundDisabled"     Color="#0AFFFFFF" />
-        <SolidColorBrush x:Key="ButtonForegroundPointerOver"  Color="{StaticResource TextPrimary}" />
-        <SolidColorBrush x:Key="ButtonForegroundPressed"      Color="{StaticResource TextPrimary}" />
-        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#3DFFFFFF" />
-        <SolidColorBrush x:Key="ButtonBorderBrushPressed"     Color="{StaticResource BrandRed}" />
-    </Page.Resources>
-
-    <!--
-        Layout mirror of the SwiftUI DashboardView:
-            ┌── ThemedBackgroundControl ──────────────────────────────┐
-            │  ┌── LeftRail ──┐  ┌── Main column ──────────────────┐  ┌──── Sidebar ────┐
-            │  │ icons        │  │ tabs                            │  │ Tracks / Cars   │
-            │  │              │  │ Performance content (scroll)    │  │ glass panel     │
-            │  │              │  │ DataStrip (footer)              │  │                 │
-            │  └──────────────┘  └─────────────────────────────────┘  └─────────────────┘
-            └─────────────────────────────────────────────────────────┘
-        Background extends edge-to-edge so theme livery photos read across the rail
-        and sidebar — same composition as the macOS build.
+        Background, LeftRail, dashboard tabs, and filter buttons all
+        live in MainWindow chrome now. Tabs sit in the titlebar slot
+        next to the K10 logomark; filters sit immediately left of the
+        system caption buttons. This page just owns the body content
+        + sidebar + footer, offset 72pt to clear the floating rail.
     -->
 
-    <!-- Background lives in MainWindow now (one livery photo for the
-         whole session). Outer grid wraps the offset content + the
-         absolute-centered ProgressRing so the spinner stays centered
-         on the full window, not on the rail-offset content. -->
+    <!-- Background + LeftRail + page tabs + filters all live in
+         MainWindow chrome now. Tabs/filters are pushed into the
+         titlebar slots from OnLoaded so they sit in the same strip
+         as the system caption buttons. The page itself just owns
+         the content + footer + spinner, offset 72pt to clear the
+         floating rail. -->
     <Grid>
         <Grid Margin="72,0,0,0">
             <Grid.ColumnDefinitions>
@@ -52,81 +31,15 @@
             <!-- Main column -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
-                    <!--
-                        Row 0 grew 44 → 76pt: 32pt at the top
-                        belongs to the chromeless window's drag
-                        region (system caption buttons live there)
-                        and the tabs Border sits in the bottom 44pt.
-                        Without this offset the tabs/dropdowns are
-                        siblings to AppTitleBar and the drag region
-                        eats their clicks — only the bottom edge of
-                        each control was reachable.
-                    -->
-                    <RowDefinition Height="76" />
+                    <!-- Spacer for the 44pt titlebar (tabs + filters
+                         live up there, in MainWindow chrome). -->
+                    <RowDefinition Height="44" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0"
-                        Padding="20,0"
-                        Height="44"
-                        VerticalAlignment="Bottom">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <components:DashboardTabs x:Name="TabsBar"
-                                                  Grid.Column="0"
-                                                  SelectionChanged="OnTabChanged" />
-
-                        <!-- Race / Practice context + License filters.
-                             DropDownButton drops a MenuFlyout. Both
-                             buttons read the current selection in
-                             their Content; clicking selects sets the
-                             pref + triggers an immediate refresh. -->
-                        <StackPanel Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    VerticalAlignment="Center">
-                            <DropDownButton x:Name="ContextFilterButton"
-                                            Style="{StaticResource AppDropDownButtonStyle}">
-                                <DropDownButton.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuFlyoutItem Text="Races"
-                                                        Click="OnContextRaceClick" />
-                                        <MenuFlyoutItem Text="Practices"
-                                                        Click="OnContextPracticeClick" />
-                                    </MenuFlyout>
-                                </DropDownButton.Flyout>
-                            </DropDownButton>
-
-                            <DropDownButton x:Name="LicenseFilterButton"
-                                            Style="{StaticResource AppDropDownButtonStyle}">
-                                <DropDownButton.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuFlyoutItem Text="All Licenses"
-                                                        Click="OnLicenseAllClick" />
-                                        <MenuFlyoutItem Text="Sports Car"
-                                                        Click="OnLicenseRoadClick" />
-                                        <MenuFlyoutItem Text="Oval"
-                                                        Click="OnLicenseOvalClick" />
-                                        <MenuFlyoutItem Text="Dirt Road"
-                                                        Click="OnLicenseDirtRoadClick" />
-                                        <MenuFlyoutItem Text="Dirt Oval"
-                                                        Click="OnLicenseDirtOvalClick" />
-                                        <MenuFlyoutItem Text="Formula"
-                                                        Click="OnLicenseFormulaClick" />
-                                    </MenuFlyout>
-                                </DropDownButton.Flyout>
-                            </DropDownButton>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Hairline under the tabs -->
+                <!-- Hairline under the titlebar tabs. -->
                 <Border Grid.Row="1"
                         Height="1"
                         Background="{StaticResource BorderSubtleBrush}" />
