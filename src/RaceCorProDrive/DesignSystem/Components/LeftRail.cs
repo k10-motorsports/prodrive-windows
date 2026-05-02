@@ -47,6 +47,7 @@ namespace RaceCorProDrive.DesignSystem.Components
             new Destination { Key = "tracks",    Label = "Tracks",    IconKind = LucideIconKind.Tracks },
             new Destination { Key = "cars",      Label = "Cars",      IconKind = LucideIconKind.Cars },
             new Destination { Key = "moments",   Label = "Moments",   IconKind = LucideIconKind.Moments },
+            new Destination { Key = "library",   Label = "Library",   IconKind = LucideIconKind.Library },
         };
 
         /// <summary>

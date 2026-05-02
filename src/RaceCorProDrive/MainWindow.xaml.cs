@@ -89,12 +89,13 @@ namespace RaceCorProDrive
             // ContentFrameLoaded handles the initial page navigation.
         }
 
-        public void NavigateToPage(string tag)
+        public void NavigateToPage(string tag, object? parameter = null)
         {
             Type pageType = tag switch
             {
                 "dashboard" => typeof(DashboardPage),
                 "library" => typeof(LibraryPage),
+                "editor" => typeof(EditorPage),
                 "races" => typeof(SessionsPage),
                 "moments" => typeof(PlaceholderPage),
                 "tracks" => typeof(PlaceholderPage),
@@ -108,8 +109,11 @@ namespace RaceCorProDrive
                 _ => typeof(DashboardPage)
             };
             _currentPageTag = tag;
-            AppRail.SelectedKey = tag;
-            ContentFrame.Navigate(pageType, tag);
+            // Editor is a sub-page of Library — keep the rail's
+            // active highlight on the parent destination so the user
+            // sees they're still inside the Library section.
+            AppRail.SelectedKey = tag == "editor" ? "library" : tag;
+            ContentFrame.Navigate(pageType, parameter ?? tag);
         }
 
         // ── Rail event handlers ─────────────────────────────────────

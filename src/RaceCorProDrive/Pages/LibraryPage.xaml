@@ -3,10 +3,13 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:RaceCorProDrive.Pages"
-    Background="{ThemeResource ApplicationBackgroundThemeBrush}"
-    Loaded="OnLoaded">
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
 
-    <Grid Padding="20">
+    <!-- Background lives in MainWindow chrome (one livery photo for
+         the whole session). Margin offsets the page past the floating
+         LeftRail (72pt) and below the 44pt titlebar. -->
+    <Grid Margin="72,44,0,0" Padding="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />

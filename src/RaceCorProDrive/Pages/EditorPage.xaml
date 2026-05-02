@@ -1,0 +1,104 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.EditorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
+
+    <!--
+        Sub-page reached by tapping a tile in LibraryPage. Plays the
+        bundle's MP4 via MediaPlayerElement (Media Foundation, native
+        H.264) with a transparent overlay above showing track / car /
+        recorded date and the live playback timestamp. Mac's editor
+        ships the same field set today (no per-frame telemetry yet);
+        a future PR adds the JSONL telemetry parse + speed/position
+        overlay.
+
+        Background lives in MainWindow chrome. Margin clears the
+        floating LeftRail (72pt) and the 44pt titlebar.
+    -->
+    <Grid Margin="72,44,0,0" Padding="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header strip: back arrow + bundle title -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="BackButton"
+                    Grid.Column="0"
+                    Click="OnBack"
+                    Margin="0,0,12,0">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72B;" FontSize="14" />
+                    <TextBlock Text="Library" />
+                </StackPanel>
+            </Button>
+
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{ThemeResource ApplicationForegroundThemeBrush}" />
+                <TextBlock x:Name="SubtitleText"
+                           FontSize="11"
+                           FontFamily="Consolas"
+                           Foreground="#7a7a85" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Player + overlay -->
+        <Grid Grid.Row="1">
+            <MediaPlayerElement x:Name="Player"
+                                AreTransportControlsEnabled="True"
+                                AutoPlay="False"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch" />
+
+            <!-- Telemetry overlay — sits above the player, top-left.
+                 Fields refresh on every PositionChanged tick (~10Hz). -->
+            <Border x:Name="OverlayPanel"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="16,16,0,0"
+                    Padding="12,10"
+                    CornerRadius="8"
+                    Background="#A0000000"
+                    BorderBrush="#3DFFFFFF"
+                    BorderThickness="1"
+                    IsHitTestVisible="False">
+                <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
+                    <TextBlock x:Name="OverlayTrack"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+                    <TextBlock x:Name="OverlayCar"
+                               FontSize="11"
+                               Foreground="#cfcfd6" />
+                    <Border Height="1" Background="#1FFFFFFF" Margin="0,4,0,4" />
+                    <TextBlock x:Name="OverlayPosition"
+                               FontSize="11"
+                               FontFamily="Consolas"
+                               Foreground="#e8e8f0" />
+                    <TextBlock x:Name="OverlayFrame"
+                               FontSize="11"
+                               FontFamily="Consolas"
+                               Foreground="#7a7a85" />
+                </StackPanel>
+            </Border>
+
+            <!-- "Bundle missing" + load-failure surface -->
+            <TextBlock x:Name="ErrorText"
+                       Foreground="#FF6B6B"
+                       FontSize="12"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</Page>
