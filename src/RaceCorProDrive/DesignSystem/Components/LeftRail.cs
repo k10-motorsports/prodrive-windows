@@ -185,6 +185,11 @@ namespace RaceCorProDrive.DesignSystem.Components
         /// and route back to the login screen.
         /// </summary>
         public event EventHandler? SignOutRequested;
+        /// <summary>
+        /// Raised when the user picks "Settings" from the profile
+        /// flyout. Host page navigates to the SettingsPage.
+        /// </summary>
+        public event EventHandler? SettingsRequested;
 
         /// <summary>
         /// Display name shown as the header of the profile flyout
@@ -204,6 +209,18 @@ namespace RaceCorProDrive.DesignSystem.Components
                 IsEnabled = false,
             };
             flyout.Items.Add(header);
+            flyout.Items.Add(new MenuFlyoutSeparator());
+
+            // Settings — Segoe Fluent gear glyph (E713) keeps the icon
+            // in scope without adding a new lucide SVG to assets.
+            var settings = new MenuFlyoutItem
+            {
+                Text = "Settings",
+                Icon = new SymbolIcon(Symbol.Setting),
+            };
+            settings.Click += (_, __) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+            flyout.Items.Add(settings);
+
             flyout.Items.Add(new MenuFlyoutSeparator());
 
             var signOut = new MenuFlyoutItem { Text = "Sign Out" };

@@ -49,15 +49,59 @@ namespace RaceCorProDrive.Pages
             OverlaySettingsService.Shared.Changed += OnSettingsFileChanged;
             OverlaySettingsService.Shared.StartWatching();
 
-            CategoryNav.SelectedItem = CategoryNav.MenuItems[0];
+            // Initialize the horizontal tab strip. Same key set the
+            // old NavigationView used so BuildCategory's switch
+            // statement keeps working unchanged.
+            CategoryTabs.Tabs = new[]
+            {
+                new HorizontalTabs.Tab { Key = "visual",     Label = "Visual" },
+                new HorizontalTabs.Tab { Key = "commentary", Label = "Commentary" },
+                new HorizontalTabs.Tab { Key = "recording",  Label = "Recording" },
+                new HorizontalTabs.Tab { Key = "system",     Label = "System" },
+            };
+            CategoryTabs.SelectedKey = _category;
             BuildCategory();
+
+            // App-level rail wiring. Same pattern as DashboardPage —
+            // user identity feeds the profile flyout, tapping a
+            // destination navigates out of Settings, Sign Out hits
+            // the auth shell, and the Settings flyout entry is a
+            // no-op while we're already on this page.
+            AppRail.UserName = App.MainWindow?.CurrentUserDisplayName ?? "User";
+            AppRail.SelectedKey = string.Empty; // no rail destination = Settings
+            AppRail.DestinationSelected += OnRailDestinationSelected;
+            AppRail.SignOutRequested += OnRailSignOutRequested;
+            AppRail.SettingsRequested += OnRailSettingsRequested;
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
+            AppRail.DestinationSelected -= OnRailDestinationSelected;
+            AppRail.SignOutRequested -= OnRailSignOutRequested;
+            AppRail.SettingsRequested -= OnRailSettingsRequested;
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
+        }
+
+        private void OnRailDestinationSelected(object? sender, string destinationKey)
+        {
+            // Any rail destination tap navigates back out to that page
+            // (LeftRail handles its own SelectedKey state internally;
+            // we just route the chosen destination to the shell).
+            App.MainWindow?.NavigateToPage(destinationKey);
+        }
+
+        private void OnRailSignOutRequested(object? sender, EventArgs e)
+        {
+            App.MainWindow?.SignOut();
+        }
+
+        private void OnRailSettingsRequested(object? sender, EventArgs e)
+        {
+            // Already on settings — no-op. Could refresh the form here
+            // if we want to add a "reload from disk" gesture, but the
+            // file watcher handles external changes already.
         }
 
         private void OnSettingsFileChanged(object? sender, OverlaySettings refreshed)
@@ -71,13 +115,10 @@ namespace RaceCorProDrive.Pages
 
         // ── Category routing ─────────────────────────────────────────
 
-        private void OnCategoryChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+        private void OnCategoryTabChanged(object? sender, string key)
         {
-            if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag)
-            {
-                _category = tag;
-                BuildCategory();
-            }
+            _category = key;
+            BuildCategory();
         }
 
         private void BuildCategory()
@@ -248,20 +289,13 @@ namespace RaceCorProDrive.Pages
 
         private void BuildCommentarySection()
         {
-            var driver = new SettingsCard
-            {
-                Title = "Driver",
-                Caption = "How the coach refers to you.",
-            };
-            driver.AddRow(MakeRow("First name", null,
-                MakeTextBox(
-                    () => _settings.CommentaryDriverFirstName ?? "",
-                    v => _settings.CommentaryDriverFirstName = v)));
-            driver.AddRow(MakeRow("Last name", null,
-                MakeTextBox(
-                    () => _settings.CommentaryDriverLastName ?? "",
-                    v => _settings.CommentaryDriverLastName = v)));
-            CardsHost.Children.Add(driver);
+            // Driver name card removed — first/last name come from the
+            // signed-in user's profile (see App.MainWindow.CurrentUser
+            // DisplayName) rather than being a settings input. The
+            // CommentaryDriverFirstName/LastName properties remain on
+            // the OverlaySettings model so existing JSON keys round-
+            // trip; the host writes them from the auth profile if the
+            // overlay still reads them.
 
             var prompts = new SettingsCard
             {
