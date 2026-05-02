@@ -29,7 +29,6 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("showBorders")]     public bool? ShowBorders { get; set; }
         [JsonPropertyName("showWebGL")]       public bool? ShowWebGL { get; set; }
         [JsonPropertyName("ambientMode")]     public string? AmbientMode { get; set; }
-        [JsonPropertyName("greenScreen")]     public bool? GreenScreen { get; set; }
         [JsonPropertyName("visualPreset")]    public string? VisualPreset { get; set; }
         [JsonPropertyName("theme")]           public string? Theme { get; set; }
 
@@ -165,7 +164,6 @@ namespace RaceCorProDrive.Services
             input.ShowBorders         ??= false;
             input.ShowWebGL           ??= true;
             input.AmbientMode         ??= "auto";
-            input.GreenScreen         ??= false;
             input.VisualPreset        ??= "standard";
             input.Theme               ??= "default";
 
