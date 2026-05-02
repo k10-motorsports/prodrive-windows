@@ -54,32 +54,6 @@ namespace RaceCorProDrive.Pages
             // — first paint shouldn't blink-default to "Races" if the
             // user previously chose Practice.
             UpdateFilterButtonLabels();
-
-            // Wire the rail's profile flyout: feed it the user's name
-            // and route Sign Out back to the MainWindow shell. The
-            // rail itself owns the menu surface; we just hand it the
-            // data + callback.
-            LeftRail.UserName = App.MainWindow?.CurrentUserDisplayName ?? "User";
-            LeftRail.SignOutRequested += OnRailSignOutRequested;
-            LeftRail.SettingsRequested += OnRailSettingsRequested;
-
-            // Overlay launcher availability — hide the FAB if the HUD
-            // binary isn't bundled (dev runs where Overlay\ wasn't
-            // dropped next to the host).
-            OverlayLaunchButton.Visibility = OverlayLauncher.Shared.IsAvailable
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            OverlayLauncher.Shared.PropertyChanged += OnOverlayStateChanged;
-        }
-
-        private void OnRailSignOutRequested(object? sender, EventArgs e)
-        {
-            App.MainWindow?.SignOut();
-        }
-
-        private void OnRailSettingsRequested(object? sender, EventArgs e)
-        {
-            App.MainWindow?.NavigateToPage("settings");
         }
 
         // ── Dashboard filter buttons (Race/Practice + License) ─────
@@ -129,58 +103,10 @@ namespace RaceCorProDrive.Pages
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DashboardPoller.Shared.PropertyChanged -= OnPollerChanged;
-            LeftRail.SignOutRequested -= OnRailSignOutRequested;
-            LeftRail.SettingsRequested -= OnRailSettingsRequested;
-            OverlayLauncher.Shared.PropertyChanged -= OnOverlayStateChanged;
             // Keep polling alive even when this Page is unloaded so
             // notifications + cached state survive nav transitions.
-            // Sign-out flows call Stop() explicitly.
-        }
-
-        // MARK: - Overlay launcher
-
-        private void OnOverlayLaunchClick(object sender, RoutedEventArgs e)
-        {
-            var process = OverlayLauncher.Shared.Launch();
-            if (process == null) return;
-
-            // Minimize (not Hide) the dashboard window. AppWindow.Hide
-            // on a chromeless WinUI 3 window where this is the only
-            // top-level Window can collapse the dispatcher loop and
-            // shut the host process down entirely; minimizing keeps
-            // the window in the OS window list and reliably restores
-            // when the overlay process exits.
-            MinimizeMainWindow();
-        }
-
-        private void OnOverlayStateChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName != nameof(OverlayLauncher.IsRunning)) return;
-            if (OverlayLauncher.Shared.IsRunning) return;
-
-            // Overlay just exited - restore the dashboard window.
-            // PropertyChanged fires from a worker thread when the OS
-            // reaps the process, so marshal back onto the UI
-            // dispatcher before touching the window.
-            DispatcherQueue.TryEnqueue(RestoreMainWindow);
-        }
-
-        private static void MinimizeMainWindow()
-        {
-            var presenter = App.MainWindow?.AppWindow?.Presenter
-                as Microsoft.UI.Windowing.OverlappedPresenter;
-            presenter?.Minimize();
-        }
-
-        private static void RestoreMainWindow()
-        {
-            var window = App.MainWindow;
-            if (window == null) return;
-            if (window.AppWindow?.Presenter is Microsoft.UI.Windowing.OverlappedPresenter p)
-            {
-                p.Restore();
-            }
-            window.Activate();
+            // Sign-out flows call Stop() explicitly. Rail wiring lives
+            // in MainWindow now — nothing page-local to detach.
         }
 
         private void OnPollerChanged(object? sender, PropertyChangedEventArgs e)

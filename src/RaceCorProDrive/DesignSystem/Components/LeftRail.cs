@@ -14,9 +14,16 @@ namespace RaceCorProDrive.DesignSystem.Components
     /// <summary>
     /// Vertical icon-only nav rail. Mirrors the macOS glass rail —
     /// 56pt wide, 36pt button cells, ultra-thin material backdrop,
-    /// hover + active states. Six top-level destinations matching the
-    /// web's lucide-react nav items, plus theme + profile entries
-    /// pinned at the bottom.
+    /// hover + active states.
+    ///
+    /// Layout (top → bottom):
+    ///   1. Brand logomark (above the glass shell)
+    ///   2. Main destinations: Dashboard / DNA / When / Tracks / Cars / Moments
+    ///   3. Divider
+    ///   4. Tools group: Settings (nav destination) + Launch HUD (action,
+    ///      brand-red filled — replaces the old floating FAB)
+    ///   5. Divider
+    ///   6. Profile (opens Sign Out flyout)
     /// </summary>
     public sealed class LeftRail : UserControl
     {
@@ -27,6 +34,11 @@ namespace RaceCorProDrive.DesignSystem.Components
             public string IconKind { get; init; } = "";
         }
 
+        /// <summary>
+        /// Top-of-rail destinations. Settings is intentionally NOT in
+        /// this list — it lives in the tools group near the bottom so
+        /// it pairs visually with the Launch HUD action button.
+        /// </summary>
         public static readonly IReadOnlyList<Destination> Destinations = new[]
         {
             new Destination { Key = "dashboard", Label = "Dashboard", IconKind = LucideIconKind.Dashboard },
@@ -37,7 +49,22 @@ namespace RaceCorProDrive.DesignSystem.Components
             new Destination { Key = "moments",   Label = "Moments",   IconKind = LucideIconKind.Moments },
         };
 
+        /// <summary>
+        /// Settings rail destination key. Routed through the same
+        /// DestinationSelected event as the top destinations so host
+        /// pages don't need a separate handler — MainWindow.NavigateToPage
+        /// already maps "settings" → SettingsPage.
+        /// </summary>
+        public const string SettingsKey = "settings";
+
         public event EventHandler<string>? DestinationSelected;
+
+        /// <summary>
+        /// Raised when the user taps the Launch HUD button in the tools
+        /// group. Host page should spawn the overlay process and
+        /// minimize the dashboard window (same flow the old FAB used).
+        /// </summary>
+        public event EventHandler? LaunchOverlayRequested;
 
         public static readonly DependencyProperty SelectedKeyProperty = DependencyProperty.Register(
             nameof(SelectedKey), typeof(string), typeof(LeftRail),
@@ -49,25 +76,35 @@ namespace RaceCorProDrive.DesignSystem.Components
             set => SetValue(SelectedKeyProperty, value);
         }
 
+        /// <summary>
+        /// Whether to show the Launch HUD action button. Set false when
+        /// the overlay binary isn't bundled next to the host (dev runs).
+        /// </summary>
+        public static readonly DependencyProperty IsLaunchOverlayAvailableProperty = DependencyProperty.Register(
+            nameof(IsLaunchOverlayAvailable), typeof(bool), typeof(LeftRail),
+            new PropertyMetadata(false, (d, _) => ((LeftRail)d).RefreshLaunchVisibility()));
+
+        public bool IsLaunchOverlayAvailable
+        {
+            get => (bool)GetValue(IsLaunchOverlayAvailableProperty);
+            set => SetValue(IsLaunchOverlayAvailableProperty, value);
+        }
+
         private readonly StackPanel _stack;
         private readonly Dictionary<string, RailButton> _buttons = new();
+        private readonly RailButton _settingsButton;
+        private readonly RailButton _launchButton;
+        private readonly Border _toolsDivider;
 
         public LeftRail()
         {
             // Width math: rail must be wide enough to fit the button
             // cell + shell margin + stack padding without clipping the
-            // active-state pill. Earlier 60pt rail + 48pt button =
-            // overflow by 12pt → clipped on the left. 68pt was an
-            // exact fit but the right edge still got shaved by
-            // sub-pixel anti-aliasing at the parent's clip boundary.
-            // 72pt gives the 44pt button 2pt of buffer on each side
-            // (72 - 12 shell margin - 6 stack padL - 6 stack padR -
-            // 44 button = 4pt slack, distributed by Center alignment).
+            // active-state pill. 72pt gives the 44pt button 2pt of
+            // buffer on each side after the 12pt shell margin and 6pt
+            // stack padding on each side.
             Width = 72;
 
-            // Spacing was tight at 4pt — every icon sat right against
-            // its neighbor and the rail read as a stamped strip rather
-            // than separate destinations. 10pt lets each cell breathe.
             _stack = new StackPanel
             {
                 Orientation = Orientation.Vertical,
@@ -77,6 +114,7 @@ namespace RaceCorProDrive.DesignSystem.Components
                 VerticalAlignment = VerticalAlignment.Top,
             };
 
+            // ── Top destinations ──────────────────────────────────────
             foreach (var dest in Destinations)
             {
                 var btn = new RailButton(dest.IconKind, dest.Label);
@@ -89,22 +127,40 @@ namespace RaceCorProDrive.DesignSystem.Components
                 _stack.Children.Add(btn);
             }
 
-            // Hairline-ish separator before theme + profile. Extra
-            // top + bottom margin gives the divider its own breathing
-            // room beyond the stack's per-child spacing.
-            _stack.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
-            {
-                Width = 24,
-                Height = 1,
-                Fill = (Brush)Application.Current.Resources["BorderSubtleBrush"],
-                Margin = new Thickness(0, 8, 0, 8),
-                HorizontalAlignment = HorizontalAlignment.Center,
-            });
+            // ── Divider before tools group ────────────────────────────
+            _stack.Children.Add(MakeHairline());
 
-            // Profile sits below the divider. Tapping it opens a
-            // MenuFlyout with the user's display name + a Sign Out
-            // action. Anchored to the right edge of the rail so the
-            // menu floats next to the icon.
+            // ── Tools group: Settings + Launch HUD ────────────────────
+            // Settings is a regular nav destination — same RailButton
+            // styling as the top group so it reads as part of the same
+            // navigation system.
+            _settingsButton = new RailButton(LucideIconKind.Settings, "Settings");
+            _settingsButton.Tapped += (_, __) =>
+            {
+                SelectedKey = SettingsKey;
+                DestinationSelected?.Invoke(this, SettingsKey);
+            };
+            _buttons[SettingsKey] = _settingsButton;
+            _stack.Children.Add(_settingsButton);
+
+            // Launch HUD: brand-red filled action button. Replaces the
+            // floating FAB that used to live at the bottom-left of the
+            // dashboard. Reads as the primary action of this group
+            // because of the filled red treatment, but shares the rail
+            // cell geometry so it sits flush with the other buttons.
+            _launchButton = new RailButton(LucideIconKind.LaunchHud, "Launch HUD")
+            {
+                IsAlwaysInactive = true,
+                Style = RailButton.ButtonStyle.PrimaryAction,
+            };
+            _launchButton.Tapped += (_, __) => LaunchOverlayRequested?.Invoke(this, EventArgs.Empty);
+            _stack.Children.Add(_launchButton);
+
+            // ── Divider before profile ────────────────────────────────
+            _toolsDivider = MakeHairline();
+            _stack.Children.Add(_toolsDivider);
+
+            // ── Profile (Sign Out flyout) ─────────────────────────────
             var profileBtn = new RailButton(LucideIconKind.Profile, "Profile") { IsAlwaysInactive = true };
             profileBtn.Tapped += (sender, _) =>
             {
@@ -125,9 +181,7 @@ namespace RaceCorProDrive.DesignSystem.Components
             //
             // VerticalAlignment.Top keeps the shell sized to its
             // content (the icon stack) instead of stretching the
-            // glass all the way to the window bottom — which is
-            // what made the rail appear "full height" after I
-            // restructured for the logo.
+            // glass all the way to the window bottom.
             var shell = new Border
             {
                 Background = new AcrylicBrush
@@ -146,9 +200,6 @@ namespace RaceCorProDrive.DesignSystem.Components
 
             // Brand logomark sits in the page's top-left empty area
             // — same column as the rail, above the glass shell.
-            // Uses the same vector data the macOS / iOS / tvOS builds
-            // render (no asset dependency). Tone.Color lights up the
-            // red diamond + dark inserts.
             var logo = new Logomark
             {
                 IconTone = Logomark.Tone.Color,
@@ -158,11 +209,6 @@ namespace RaceCorProDrive.DesignSystem.Components
                 HorizontalAlignment = HorizontalAlignment.Center,
             };
 
-            // Two-row Grid, both rows Auto so the rail UserControl
-            // shrinks to fit its content. A Star row would let the
-            // shell stretch to whatever vertical space the rail's
-            // grid column gives it — that's what made the nav glass
-            // run the full window height after the logo restructure.
             var root = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Top,
@@ -176,6 +222,24 @@ namespace RaceCorProDrive.DesignSystem.Components
 
             Content = root;
             Refresh();
+            RefreshLaunchVisibility();
+        }
+
+        private static Border MakeHairline()
+        {
+            // Wrapped in a Border so the parent StackPanel can collapse
+            // the slot via Visibility = Collapsed without leaving a gap.
+            return new Border
+            {
+                Margin = new Thickness(0, 8, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Child = new Microsoft.UI.Xaml.Shapes.Rectangle
+                {
+                    Width = 24,
+                    Height = 1,
+                    Fill = (Brush)Application.Current.Resources["BorderSubtleBrush"],
+                },
+            };
         }
 
         public event EventHandler? ProfileRequested;
@@ -185,11 +249,6 @@ namespace RaceCorProDrive.DesignSystem.Components
         /// and route back to the login screen.
         /// </summary>
         public event EventHandler? SignOutRequested;
-        /// <summary>
-        /// Raised when the user picks "Settings" from the profile
-        /// flyout. Host page navigates to the SettingsPage.
-        /// </summary>
-        public event EventHandler? SettingsRequested;
 
         /// <summary>
         /// Display name shown as the header of the profile flyout
@@ -211,18 +270,8 @@ namespace RaceCorProDrive.DesignSystem.Components
             flyout.Items.Add(header);
             flyout.Items.Add(new MenuFlyoutSeparator());
 
-            // Settings — Segoe Fluent gear glyph (E713) keeps the icon
-            // in scope without adding a new lucide SVG to assets.
-            var settings = new MenuFlyoutItem
-            {
-                Text = "Settings",
-                Icon = new SymbolIcon(Symbol.Setting),
-            };
-            settings.Click += (_, __) => SettingsRequested?.Invoke(this, EventArgs.Empty);
-            flyout.Items.Add(settings);
-
-            flyout.Items.Add(new MenuFlyoutSeparator());
-
+            // Settings is reachable from the rail itself now (tools
+            // group), so the flyout only carries the Sign Out action.
             var signOut = new MenuFlyoutItem { Text = "Sign Out" };
             signOut.Click += (_, __) => SignOutRequested?.Invoke(this, EventArgs.Empty);
             flyout.Items.Add(signOut);
@@ -237,13 +286,29 @@ namespace RaceCorProDrive.DesignSystem.Components
             }
         }
 
+        private void RefreshLaunchVisibility()
+        {
+            var visible = IsLaunchOverlayAvailable;
+            _launchButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            // When the launch button is hidden, the tools group
+            // collapses to just Settings — no need for the second
+            // divider since Settings sits flush against the profile
+            // section already separated by the upper divider.
+            _toolsDivider.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         /// <summary>
-        /// 36×36 cell that mirrors the SwiftUI <c>RailIconLabel</c> —
+        /// 44×40 cell that mirrors the SwiftUI <c>RailIconLabel</c> —
         /// rounded square, brand-tinted fill when active, soft hover.
+        /// PrimaryAction style swaps in a filled brand-red treatment
+        /// for the Launch HUD button (replaces the old floating FAB).
         /// </summary>
         private sealed class RailButton : UserControl
         {
+            public enum ButtonStyle { Default, PrimaryAction }
+
             public bool IsAlwaysInactive { get; init; }
+            public ButtonStyle Style { get; init; } = ButtonStyle.Default;
 
             private readonly LucideIcon _icon;
             private readonly Border _bg;
@@ -258,11 +323,6 @@ namespace RaceCorProDrive.DesignSystem.Components
 
             public RailButton(string iconKind, string tooltip)
             {
-                // 24×24 icon inside a 44×40 cell. Cell is wider than
-                // tall so the active pill reads as a pill, not a
-                // square. Outer Width must match the inner Border or
-                // the active fill clips against the parent stack —
-                // see the rail Width math in LeftRail's ctor.
                 _icon = new LucideIcon { Kind = iconKind, Width = 24, Height = 24 };
                 _bg = new Border
                 {
@@ -272,8 +332,8 @@ namespace RaceCorProDrive.DesignSystem.Components
                     Child = _icon,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(8),
                 };
-                _bg.Padding = new Thickness(8);
 
                 Width = 44;
                 Height = 40;
@@ -288,10 +348,21 @@ namespace RaceCorProDrive.DesignSystem.Components
 
             private void UpdateState()
             {
-                // Active state was nearly invisible at 0x2E (~18%
-                // brand-red alpha) — bumped to 0x59 (~35%) so the
-                // selected destination is unambiguous at a glance
-                // without overpowering the icon.
+                if (Style == ButtonStyle.PrimaryAction)
+                {
+                    // Brand-red filled treatment, slightly brighter on
+                    // hover. Always reads as the primary action of the
+                    // tools group; no active/inactive state since this
+                    // is an action, not a destination.
+                    _bg.Background = _isHovered
+                        ? new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x5B, 0x47))
+                        : new SolidColorBrush(Color.FromArgb(0xFF, 0xE5, 0x39, 0x35));
+                    _bg.BorderBrush = new SolidColorBrush(Color.FromArgb(_isHovered ? (byte)0xFF : (byte)0xCC, 0xFF, 0xFF, 0xFF));
+                    _bg.BorderThickness = new Thickness(1);
+                    _icon.Opacity = 1.0;
+                    return;
+                }
+
                 var active = !IsAlwaysInactive && _isActive;
                 _bg.Background = active
                     ? new SolidColorBrush(Color.FromArgb(0x59, 0xE5, 0x39, 0x35))

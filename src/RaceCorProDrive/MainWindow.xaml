@@ -2,30 +2,47 @@
     x:Class="RaceCorProDrive.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:design="using:RaceCorProDrive.DesignSystem"
+    xmlns:components="using:RaceCorProDrive.DesignSystem.Components"
     xmlns:local="using:RaceCorProDrive">
 
     <!--
         RequestedTheme=Dark forces all WinUI default brushes
         (DropDownButton chevrons, MenuFlyout backgrounds, ProgressRing,
         etc.) to resolve in dark mode regardless of the user's system
-        theme. Without this, the dashboard's filter dropdowns render
-        black chevrons on dark glass on light-system-theme machines.
+        theme.
 
         Layout uses z-order, NOT rows: the active page Frame fills the
-        whole window so its livery photo + content extend to y=0.
-        AppTitleBar floats on top as a transparent 32pt drag region
-        that hosts the system caption buttons (min/max/close) — the
-        only "title bar" Windows lets us keep, and even those float
-        directly over the page content with no visible chrome.
+        whole window so its livery photo + content extend to y=0. The
+        LeftRail floats on top as a 72pt acrylic glass column hugging
+        the left edge — it lives in the *window* chrome (not in any
+        page) so navigating between pages animates only the page's
+        content, leaving the rail in place. AppTitleBar floats on top
+        as a transparent 32pt drag region that hosts the system caption
+        buttons (min/max/close).
     -->
     <Grid Background="{ThemeResource ApplicationBackgroundThemeBrush}"
           RequestedTheme="Dark">
 
-        <!-- Authed shell: a Frame holding the active page. Pages own
-             their own primary nav (LeftRail) and just need to keep
-             their top-right ~140×32pt corner free of interactive
-             controls so the system caption buttons aren't obscured. -->
+        <!-- App-level themed backdrop. Hoisted out of individual pages
+             so the livery photo is set once at sign-in and stays put
+             across navigations — no flicker, no per-page re-fade. -->
+        <design:ThemedBackgroundControl x:Name="AppBackground" />
+
+        <!-- Authed shell: page Frame fills the whole window. Pages
+             reserve their left 72pt for the floating rail by adding
+             left padding/margin to their content; the rail's acrylic
+             glass lets the page's background show through. -->
         <Frame x:Name="ContentFrame" Visibility="Collapsed" Loaded="OnContentFrameLoaded" />
+
+        <!-- App-level navigation rail. Hoisted out of individual pages
+             so page transitions only animate the page content, not the
+             rail. Visibility flips with auth state (collapsed pre-auth
+             so the LoginPage owns the full window). -->
+        <components:LeftRail x:Name="AppRail"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Stretch"
+                             Visibility="Collapsed" />
 
         <!-- Pre-auth: LoginPage rendered full-window. -->
         <Frame x:Name="AuthFrame" Loaded="OnAuthFrameLoaded" />
