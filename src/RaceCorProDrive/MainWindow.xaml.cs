@@ -131,14 +131,7 @@ namespace RaceCorProDrive
 
         private void OnRailLaunchOverlayRequested(object? sender, EventArgs e)
         {
-            var process = OverlayLauncher.Shared.Launch();
-            if (process == null) return;
-
-            // Don't minimize the host while racing — switch to Settings
-            // instead so the user has a useful surface to look at while
-            // the in-game HUD runs on top of iRacing. The overlay grabs
-            // the in-game window's focus on its own.
-            NavigateToPage("settings");
+            OverlayLauncher.Shared.Launch();
         }
 
         private void OnOverlayStateChanged(object? sender, PropertyChangedEventArgs e)
