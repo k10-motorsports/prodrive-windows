@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.Pages;
 using RaceCorProDrive.Auth;
 using RaceCorProDrive.DesignSystem.Components;
 using RaceCorProDrive.Services;
+using Windows.Graphics;
 
 namespace RaceCorProDrive
 {
@@ -26,6 +29,16 @@ namespace RaceCorProDrive
             this.InitializeComponent();
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
+
+            // SetTitleBar treats every child of AppTitleBar as drag region
+            // unless the child is a ButtonBase descendant. Our HorizontalTabs
+            // / DashboardTabs are UserControls with manual Tapped handlers,
+            // so without an explicit passthrough region the system eats
+            // the click before the handler fires. Carve out the two host
+            // slots as Passthrough so clicks reach the tab buttons.
+            TitleBarTabsHost.SizeChanged += (_, __) => RefreshTitleBarPassthrough();
+            TitleBarFiltersHost.SizeChanged += (_, __) => RefreshTitleBarPassthrough();
+            AppTitleBar.SizeChanged += (_, __) => RefreshTitleBarPassthrough();
 
             // Wire the app-level rail. Events are routed window-level
             // (not per-page) since the rail is part of the window chrome
@@ -131,14 +144,7 @@ namespace RaceCorProDrive
 
         private void OnRailLaunchOverlayRequested(object? sender, EventArgs e)
         {
-            var process = OverlayLauncher.Shared.Launch();
-            if (process == null) return;
-
-            // Don't minimize the host while racing — switch to Settings
-            // instead so the user has a useful surface to look at while
-            // the in-game HUD runs on top of iRacing. The overlay grabs
-            // the in-game window's focus on its own.
-            NavigateToPage("settings");
+            OverlayLauncher.Shared.Launch();
         }
 
         private void OnOverlayStateChanged(object? sender, PropertyChangedEventArgs e)
@@ -161,11 +167,50 @@ namespace RaceCorProDrive
         public void SetTitleBarTabs(UIElement? tabs)
         {
             TitleBarTabsHost.Content = tabs;
+            // Layout hasn't run yet for the new content — defer the
+            // passthrough recompute so ActualWidth/Height are populated.
+            DispatcherQueue.TryEnqueue(RefreshTitleBarPassthrough);
         }
 
         public void SetTitleBarFilters(UIElement? filters)
         {
             TitleBarFiltersHost.Content = filters;
+            DispatcherQueue.TryEnqueue(RefreshTitleBarPassthrough);
+        }
+
+        // ── Titlebar passthrough regions ─────────────────────────────
+        //
+        // Tells the system "these rects are not titlebar — let clicks
+        // through to the app's input pipeline." Without this the drag
+        // region eats taps on anything that isn't a ButtonBase. Recompute
+        // whenever a host's size or content changes.
+        private void RefreshTitleBarPassthrough()
+        {
+            if (this.AppWindow is null) return;
+
+            var rects = new List<RectInt32>();
+            AddPassthroughRect(rects, TitleBarTabsHost);
+            AddPassthroughRect(rects, TitleBarFiltersHost);
+
+            var ncSource = InputNonClientPointerSource.GetForWindowId(this.AppWindow.Id);
+            ncSource.SetRegionRects(NonClientRegionKind.Passthrough, rects.ToArray());
+        }
+
+        private static void AddPassthroughRect(List<RectInt32> rects, FrameworkElement element)
+        {
+            if (element is null || element.XamlRoot is null) return;
+            if (element.ActualWidth < 1 || element.ActualHeight < 1) return;
+
+            // Element bounds in DIPs relative to the XAML root.
+            var transform = element.TransformToVisual(null);
+            var origin = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
+            var scale = element.XamlRoot.RasterizationScale;
+
+            rects.Add(new RectInt32(
+                (int)Math.Round(origin.X * scale),
+                (int)Math.Round(origin.Y * scale),
+                (int)Math.Round(element.ActualWidth * scale),
+                (int)Math.Round(element.ActualHeight * scale)));
         }
     }
 }

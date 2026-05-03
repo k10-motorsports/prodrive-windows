@@ -83,7 +83,10 @@ namespace RaceCorProDrive.Pages
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
             UpdateService.Shared.PropertyChanged -= OnUpdateServicePropertyChanged;
-            App.MainWindow?.SetTitleBarTabs(null);
+            // Don't clear the titlebar slot here — Frame nav fires the
+            // next page's OnLoaded BEFORE this OnUnloaded, so a clear
+            // would wipe whatever the new page just set. Each page sets
+            // its own slots in OnLoaded.
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
         }
@@ -410,7 +413,8 @@ namespace RaceCorProDrive.Pages
                 () => _settings.RecordingMicEnabled ?? false,
                 v => _settings.RecordingMicEnabled = v));
             audio.AddRow(MakeRow("Mic device", null,
-                MakeTextBox(
+                new DevicePickerRow(
+                    Windows.Devices.Enumeration.DeviceClass.AudioCapture,
                     () => _settings.RecordingMicDevice ?? "",
                     v => _settings.RecordingMicDevice = v)));
             audio.AddRow(MakeSlider("Mic volume", null, 0, 100, 1,
@@ -418,7 +422,11 @@ namespace RaceCorProDrive.Pages
                 v => _settings.RecordingMicVolume = v / 100,
                 "0", "%"));
             audio.AddRow(MakeRow("System audio device", null,
-                MakeTextBox(
+                new DevicePickerRow(
+                    // AudioRender = output devices. The recorder uses
+                    // loopback capture against the selected output to
+                    // mix system sound into the recording.
+                    Windows.Devices.Enumeration.DeviceClass.AudioRender,
                     () => _settings.RecordingSystemAudioDevice ?? "",
                     v => _settings.RecordingSystemAudioDevice = v)));
             audio.AddRow(MakeSlider("System volume", null, 0, 100, 1,
@@ -429,7 +437,8 @@ namespace RaceCorProDrive.Pages
 
             var facecam = new SettingsCard { Title = "Facecam", Caption = "Optional in-frame webcam." };
             facecam.AddRow(MakeRow("Camera", null,
-                MakeTextBox(
+                new DevicePickerRow(
+                    Windows.Devices.Enumeration.DeviceClass.VideoCapture,
                     () => _settings.RecordingWebcamDevice ?? "",
                     v => _settings.RecordingWebcamDevice = v)));
             facecam.AddRow(MakeRow("Size", null,

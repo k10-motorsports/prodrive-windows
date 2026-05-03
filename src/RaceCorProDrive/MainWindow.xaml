@@ -49,12 +49,16 @@
 
         <!-- Drag region floating at the top of the window. SetTitleBar()
              in the code-behind hands this to the system as the "title
-             bar" — interactive children get clicks normally; only empty
-             space drags. The titlebar is now 44pt tall to host page
-             tabs (left of the system caption buttons) and dashboard
-             filters (immediately left of the caption buttons). Pages
-             push their tabs/filters into TitleBarTabsHost / TitleBarFiltersHost
-             via MainWindow.SetTitleBarTabs / SetTitleBarFilters. -->
+             bar". By default ONLY ButtonBase descendants stay clickable;
+             the rest of the bar drags. MainWindow's RefreshTitleBarPassthrough
+             carves out the tabs/filters host rects via InputNonClientPointerSource
+             so UserControl-based tab strips (HorizontalTabs, DashboardTabs)
+             still receive their tap events. The titlebar is 44pt tall to
+             host page tabs (left of the system caption buttons) and
+             dashboard filters (immediately left of the caption buttons).
+             Pages push their tabs/filters into TitleBarTabsHost /
+             TitleBarFiltersHost via MainWindow.SetTitleBarTabs /
+             SetTitleBarFilters. -->
         <Grid x:Name="AppTitleBar" Height="44" Background="Transparent" VerticalAlignment="Top">
             <Grid.ColumnDefinitions>
                 <!-- Reserved for the LeftRail logo/column (rail floats
