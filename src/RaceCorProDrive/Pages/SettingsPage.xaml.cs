@@ -83,7 +83,10 @@ namespace RaceCorProDrive.Pages
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
             UpdateService.Shared.PropertyChanged -= OnUpdateServicePropertyChanged;
-            App.MainWindow?.SetTitleBarTabs(null);
+            // Don't clear the titlebar slot here — Frame nav fires the
+            // next page's OnLoaded BEFORE this OnUnloaded, so a clear
+            // would wipe whatever the new page just set. Each page sets
+            // its own slots in OnLoaded.
             // Don't StopWatching — other pages (e.g. dashboard's HUD
             // status indicator) want to know about external changes too.
         }

@@ -182,14 +182,12 @@ namespace RaceCorProDrive.Pages
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DashboardPoller.Shared.PropertyChanged -= OnPollerChanged;
-            // Clear the titlebar slots we pushed into MainWindow on
-            // load so the next page's tabs/filters can take over.
-            App.MainWindow?.SetTitleBarTabs(null);
-            App.MainWindow?.SetTitleBarFilters(null);
-            // Keep polling alive even when this Page is unloaded so
-            // notifications + cached state survive nav transitions.
-            // Sign-out flows call Stop() explicitly. Rail wiring lives
-            // in MainWindow now — nothing page-local to detach.
+            // Don't clear the titlebar slots here — Frame nav fires the
+            // next page's OnLoaded BEFORE this OnUnloaded, so a clear
+            // would wipe whatever the new page just set. Each page is
+            // responsible for setting both slots in its own OnLoaded
+            // (its widgets, or null). Keep polling alive across nav so
+            // notifications + cached state survive transitions.
         }
 
         private void OnPollerChanged(object? sender, PropertyChangedEventArgs e)

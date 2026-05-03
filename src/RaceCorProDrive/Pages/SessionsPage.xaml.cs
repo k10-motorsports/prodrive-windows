@@ -21,6 +21,8 @@ namespace RaceCorProDrive.Pages
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
+            App.MainWindow?.SetTitleBarTabs(null);
+            App.MainWindow?.SetTitleBarFilters(null);
             await LoadSessions();
         }
 

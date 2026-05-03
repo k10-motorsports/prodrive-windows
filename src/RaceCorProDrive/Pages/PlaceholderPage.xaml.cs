@@ -14,6 +14,12 @@ namespace RaceCorProDrive.Pages
         {
             base.OnNavigatedTo(e);
 
+            // Clear titlebar slots so we don't inherit tabs/filters from
+            // whatever page navigated us here. This page has no chrome
+            // of its own.
+            App.MainWindow?.SetTitleBarTabs(null);
+            App.MainWindow?.SetTitleBarFilters(null);
+
             // The tag is passed as the parameter
             if (e.Parameter is string tag)
             {
