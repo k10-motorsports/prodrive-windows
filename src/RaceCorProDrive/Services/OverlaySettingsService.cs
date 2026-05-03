@@ -16,10 +16,13 @@ namespace RaceCorProDrive.Services
     ///     refreshes the bound page.
     ///
     /// The settings file lives at
-    ///   %APPDATA%\RaceCor.io\overlay-settings.json
-    /// — same path the HUD already uses (via Electron's
-    /// <c>app.getPath('userData')</c>). Keeping it there means existing
-    /// installs don't lose their configuration when the host takes over.
+    ///   %APPDATA%\K10 Motorsports\overlay-settings.json
+    /// — same path the HUD reads/writes via Electron's
+    /// <c>app.getPath('userData')</c>. The HUD's <c>main.js</c> calls
+    /// <c>app.setName('K10 Motorsports')</c>, which is what determines the
+    /// userData folder on Windows (NOT package.json's <c>name</c>, which
+    /// is "racecor-overlay"). If you change the name on either side, the
+    /// other side must change too or settings stop propagating.
     /// </summary>
     public sealed class OverlaySettingsService
     {
@@ -42,11 +45,11 @@ namespace RaceCorProDrive.Services
 
         private OverlaySettingsService()
         {
-            // %APPDATA%\RaceCor.io\overlay-settings.json — Electron's
-            // userData root for this app on Windows is
-            // %APPDATA%\RaceCor.io (set via package.json's `name`).
+            // %APPDATA%\K10 Motorsports\overlay-settings.json — must match
+            // Electron's `app.getPath('userData')`, which is driven by the
+            // overlay's `app.setName('K10 Motorsports')` call in main.js.
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var dir = Path.Combine(appData, "RaceCor.io");
+            var dir = Path.Combine(appData, "K10 Motorsports");
             Directory.CreateDirectory(dir);
             _path = Path.Combine(dir, "overlay-settings.json");
         }

@@ -4,15 +4,16 @@ name: Build & Release
 # repo. Consumes the *latest* GitHub release of:
 #   - k10-motorsports/prodrive-plugin   (SimHub plugin assets)
 #   - k10-motorsports/prodrive-overlay  (Electron HUD, win-x64 unpacked tree)
+#   - k10-motorsports/prodrive-server   (Chrome extension — optional;
+#                                         skipped if no release exists)
 # Builds the WinUI 3 host from source, then runs Inno Setup to bundle
-# the three pieces into one .exe and attaches it to a release on this
-# repo.
+# the pieces into one .exe and attaches it to a release on this repo.
 #
 # Required repository secrets:
-#   CROSS_REPO_PAT  — PAT (or GitHub App token) with `contents:read`
-#                     on prodrive-plugin and prodrive-overlay. The
-#                     default GITHUB_TOKEN cannot download release
-#                     assets from sibling private repos.
+#   CROSS_REPO_PAT  — PAT (or GitHub App token) with `contents:read` on
+#                     prodrive-plugin, prodrive-overlay, and
+#                     prodrive-server. The default GITHUB_TOKEN cannot
+#                     download release assets from sibling private repos.
 
 on:
   push:
@@ -96,6 +97,44 @@ jobs:
           Expand-Archive -Path artifacts/overlay/overlay-win-unpacked.zip `
             -DestinationPath artifacts/overlay/unpacked -Force
           "HUD_UNPACKED=$((Resolve-Path artifacts/overlay/unpacked).Path)" >> $env:GITHUB_ENV
+
+      # ─── Download latest Chrome extension release (optional) ───────
+      # prodrive-server publishes via .github/workflows/release-extension.yml,
+      # which attaches `racecor-iracing-sync.zip` to every release tagged
+      # `extension-v*`. If no release exists yet (first installer build
+      # before the extension's first release) we skip silently — the
+      # .iss bundles the payload only when EXTENSION_SRC is non-empty.
+      - name: Download latest prodrive-server Chrome extension
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/extension | Out-Null
+          $downloaded = $false
+          try {
+            gh release download `
+              --repo k10-motorsports/prodrive-server `
+              --pattern "racecor-iracing-sync.zip" `
+              --dir artifacts/extension
+            if ($LASTEXITCODE -eq 0 -and (Test-Path "artifacts/extension/racecor-iracing-sync.zip")) {
+              $downloaded = $true
+            }
+          } catch {
+            Write-Host "Chrome extension release not found yet; skipping."
+          }
+          if ($downloaded) {
+            Expand-Archive -Path artifacts/extension/racecor-iracing-sync.zip `
+              -DestinationPath artifacts/extension/unpacked -Force
+            # The zip stages a top-level `racecor-iracing-sync/` folder
+            # whose contents are what ISCC needs to glob.
+            $extDir = Join-Path (Resolve-Path artifacts/extension/unpacked) 'racecor-iracing-sync'
+            if (-not (Test-Path (Join-Path $extDir 'manifest.json'))) {
+              throw "Extension zip layout unexpected — manifest.json not found at $extDir"
+            }
+            "EXTENSION_SRC=$extDir" >> $env:GITHUB_ENV
+          } else {
+            Write-Host "::warning::Chrome extension release not available; installer will ship without {app}\ChromeExtension."
+          }
 
       # ─── Workaround: drop System.Security.Permissions 6.0.0 next to
       # the in-process XAML compiler task so .NET 8 MSBuild can load it.
@@ -198,13 +237,20 @@ jobs:
         shell: pwsh
         run: |
           $iss = "installer/RaceCorProDrive.iss"
-          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" `
-            $iss `
-            "/DAppVersion=${{ steps.version.outputs.VERSION }}" `
-            "/DAppArch=${{ matrix.arch }}" `
-            "/DHOST_PUBLISH=$env:HOST_PUBLISH" `
-            "/DHUD_UNPACKED=$env:HUD_UNPACKED" `
+          $args = @(
+            $iss,
+            "/DAppVersion=${{ steps.version.outputs.VERSION }}",
+            "/DAppArch=${{ matrix.arch }}",
+            "/DHOST_PUBLISH=$env:HOST_PUBLISH",
+            "/DHUD_UNPACKED=$env:HUD_UNPACKED",
             "/DPLUGIN_UNPACKED=$env:PLUGIN_UNPACKED"
+          )
+          # Chrome extension is optional; only define EXTENSION_SRC
+          # when the download step actually staged a folder.
+          if ($env:EXTENSION_SRC) {
+            $args += "/DEXTENSION_SRC=$env:EXTENSION_SRC"
+          }
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" @args
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
 
       - name: Publish release
