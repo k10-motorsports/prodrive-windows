@@ -49,13 +49,6 @@
     -->
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
-    <!--
-      Win2D for WinUI 3 — provides GaussianBlurEffect via the
-      Composition / IGraphicsEffect surface. ThemedBackgroundControl
-      uses it to blur the livery photo without a CPU-side pre-blur
-      (which wouldn't track DPI changes).
-    -->
-    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
   </ItemGroup>
 
   <ItemGroup>
