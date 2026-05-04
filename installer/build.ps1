@@ -67,12 +67,26 @@ if (-not $SkipHud) {
 }
 
 # ── 3. Chrome extension (optional) ──
-# prodrive-server's apps/web/browser-extension/ is the Manifest V3 source
-# tree. We copy it into a staging dir under installer/ so ISCC can reference
-# it via the EXTENSION_SRC define. If prodrive-server isn't checked out
-# alongside the other repos we silently skip — the .iss file's [Files]
-# section gates the bundle on EXTENSION_SRC being defined.
+# prodrive-server's apps/web/browser-extension/ is the Manifest V3
+# source tree. Two paths the installer can take:
+#
+#   (a) Unpacked tree — bundled at {app}\ChromeExtension\unpacked\.
+#       Powers the host's Load-unpacked card. Always staged when the
+#       sibling repo is present.
+#
+#   (b) Signed .crx + extension ID + version — passed through to
+#       [Registry] in the .iss so Chrome offers to install on next
+#       launch. Requires CI to have packed and dropped the .crx;
+#       local builds skip this and fall back to (a) only.
+#
+# CI sets EXTENSION_CRX_FILE / EXTENSION_ID / EXTENSION_VERSION
+# environment variables before invoking this script (see
+# .github/workflows/release.yml). Local runs leave them unset and
+# only ship the unpacked variant.
 $extensionSrc = $null
+$extensionCrx = $env:EXTENSION_CRX_FILE
+$extensionId  = $env:EXTENSION_ID
+$extensionVer = $env:EXTENSION_VERSION
 if (-not $SkipExtension) {
     $serverExtDir = $null
     if (Test-Path $ServerRepo) {
@@ -83,7 +97,7 @@ if (-not $SkipExtension) {
         }
     }
     if ($serverExtDir) {
-        Write-Host "→ Staging Chrome extension from $serverExtDir…" -ForegroundColor Cyan
+        Write-Host "→ Staging Chrome extension (unpacked) from $serverExtDir…" -ForegroundColor Cyan
         $extensionSrc = Join-Path $PSScriptRoot 'staging\ChromeExtension'
         if (Test-Path $extensionSrc) { Remove-Item -Recurse -Force $extensionSrc }
         New-Item -ItemType Directory -Path $extensionSrc -Force | Out-Null
@@ -98,7 +112,15 @@ if (-not $SkipExtension) {
             }
         }
     } else {
-        Write-Host "  (Chrome extension source not found at $ServerRepo\apps\web\browser-extension — skipping)" -ForegroundColor Yellow
+        Write-Host "  (Chrome extension source not found at $ServerRepo\apps\web\browser-extension — skipping unpacked variant)" -ForegroundColor Yellow
+    }
+    if ($extensionCrx -and (Test-Path $extensionCrx) -and $extensionId -and $extensionVer) {
+        Write-Host "→ Bundling signed Chrome extension: $extensionCrx (id=$extensionId, version=$extensionVer)" -ForegroundColor Cyan
+    } elseif ($extensionCrx -or $extensionId -or $extensionVer) {
+        Write-Host "  (Partial .crx bundle config — need EXTENSION_CRX_FILE + EXTENSION_ID + EXTENSION_VERSION; skipping registry path)" -ForegroundColor Yellow
+        $extensionCrx = $null
+        $extensionId  = $null
+        $extensionVer = $null
     }
 }
 
@@ -116,6 +138,11 @@ $iss = Join-Path $PSScriptRoot 'RaceCorProDrive.iss'
 $isccArgs = @($iss, "/DHOST_PUBLISH=$publishDir", "/DHUD_UNPACKED=$hudUnpacked")
 if ($extensionSrc) {
     $isccArgs += "/DEXTENSION_SRC=$extensionSrc"
+}
+if ($extensionCrx -and $extensionId -and $extensionVer) {
+    $isccArgs += "/DEXTENSION_CRX=$extensionCrx"
+    $isccArgs += "/DEXTENSION_ID=$extensionId"
+    $isccArgs += "/DEXTENSION_VERSION=$extensionVer"
 }
 & $iscc @isccArgs | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
