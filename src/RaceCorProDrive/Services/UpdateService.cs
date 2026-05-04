@@ -17,14 +17,23 @@ using RaceCorProDrive.Support;
 namespace RaceCorProDrive.Services
 {
     /// <summary>
-    /// GitHub Releases poller for prodrive-windows. Migrated out of the
+    /// Release-info poller for prodrive-windows. Migrated out of the
     /// SimHub plugin so the host (the user's primary surface) owns the
     /// update flow. The plugin keeps a static version display only.
     ///
     /// Singleton with INotifyPropertyChanged so the Settings/System
     /// "Update" card can bind reactively to status changes.
     ///
-    /// Repo: k10-motorsports/prodrive-windows.
+    /// Talks to the prodrive-server proxy at
+    ///   {WebAppBase}/api/v1/host/latest-release
+    /// rather than GitHub's API directly. The repo
+    /// (k10-motorsports/prodrive-windows) is private, so an unauthenticated
+    /// request to api.github.com/.../releases/latest returns 404 and the
+    /// auto-updater silently never finds an update. The proxy holds the
+    /// GitHub token server-side and rewrites asset URLs to point back at
+    /// {WebAppBase}/api/download/latest, which resolves a fresh signed
+    /// URL on every hit so the host never needs a token of its own.
+    ///
     /// Asset name pattern: RaceCorProDrive-Setup-{version}-{arch}.exe
     /// (Inno Setup output — see installer/RaceCorProDrive.iss).
     /// Two assets per release: x64 + arm64. We pick the one matching
@@ -35,8 +44,13 @@ namespace RaceCorProDrive.Services
         public static UpdateService Shared { get; } = new();
 
         // ── Config ──────────────────────────────────────────────
-        private const string ReleasesApi =
-            "https://api.github.com/repos/k10-motorsports/prodrive-windows/releases/latest";
+        // Web-app proxy that forwards the GitHub API call with a
+        // server-side token. The path is the v1 host endpoint —
+        // dev/staging override the host part via RACECOR_WEB_BASE.
+        private static readonly string ReleasesApi =
+            (Environment.GetEnvironmentVariable("RACECOR_WEB_BASE")?.TrimEnd('/')
+             ?? "https://prodrive.racecor.io")
+            + "/api/v1/host/latest-release";
         private const string UserAgent = "RaceCorProDrive-Host";
         // AppSettings key for the auto-update toggle. Default true —
         // racing rigs are usually unattended; getting the latest fix
