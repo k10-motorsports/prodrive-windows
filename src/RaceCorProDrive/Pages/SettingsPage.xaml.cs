@@ -556,14 +556,23 @@ namespace RaceCorProDrive.Pages
 
         // ── Browser integration card ─────────────────────────────
         //
-        // The Chrome extension ("RaceCor iRacing Sync") is bundled into
-        // the installer at {app}\ChromeExtension when prodrive-server is
-        // available at build time. Chrome doesn't allow programmatic
-        // installation outside the Web Store / enterprise policies, so
-        // the user has to load the unpacked folder themselves. This
-        // card opens the folder in Explorer and Chrome's extensions
-        // page in tandem, then shows the three steps inline so they
-        // never have to leave the host to remember the flow.
+        // Chrome extension install path depends on what the installer
+        // bundled:
+        //
+        //  • Signed .crx + registry entry — installer drops a HKCU
+        //    Software\Google\Chrome\Extensions\<id> key pointing at
+        //    {app}\ChromeExtension\racecor-iracing-sync.crx. Chrome
+        //    offers to install on its next launch (subject to per-
+        //    browser external-extension policy). This card just
+        //    confirms the registration is in place and offers
+        //    chrome://extensions for verification.
+        //
+        //  • Unpacked tree only — the .crx wasn't bundled (CI didn't
+        //    have a signing key, or local build). Card walks the
+        //    user through Load-unpacked manually.
+        //
+        //  • Nothing bundled — explain that the next installer build
+        //    will fix this, no buttons.
         private SettingsCard BuildBrowserIntegrationCard()
         {
             var card = new SettingsCard
@@ -572,12 +581,24 @@ namespace RaceCorProDrive.Pages
                 Caption = "Sync your iRacing rating history and race results into Pro Drive automatically.",
             };
 
-            var extDir = System.IO.Path.Combine(
-                AppContext.BaseDirectory, "ChromeExtension");
-            var manifestPath = System.IO.Path.Combine(extDir, "manifest.json");
-            var bundled = System.IO.File.Exists(manifestPath);
+            var extRoot = System.IO.Path.Combine(AppContext.BaseDirectory, "ChromeExtension");
+            var crxPath = System.IO.Path.Combine(extRoot, "racecor-iracing-sync.crx");
+            var unpackedDir = System.IO.Path.Combine(extRoot, "unpacked");
+            var unpackedManifest = System.IO.Path.Combine(unpackedDir, "manifest.json");
+            // Older installers dropped manifest.json directly under
+            // {app}\ChromeExtension. Treat that as the unpacked dir
+            // for back-compat with installs done before the layout split.
+            var legacyManifest = System.IO.Path.Combine(extRoot, "manifest.json");
+            if (!System.IO.File.Exists(unpackedManifest) && System.IO.File.Exists(legacyManifest))
+            {
+                unpackedDir = extRoot;
+                unpackedManifest = legacyManifest;
+            }
 
-            if (!bundled)
+            var hasCrx = System.IO.File.Exists(crxPath);
+            var hasUnpacked = System.IO.File.Exists(unpackedManifest);
+
+            if (!hasCrx && !hasUnpacked)
             {
                 card.AddRow(MakeRow("Status", null,
                     new TextBlock
@@ -588,38 +609,56 @@ namespace RaceCorProDrive.Pages
                 return card;
             }
 
-            card.AddRow(MakeRow("Step 1", "Open the extension folder, then drag it onto chrome://extensions in the next step.",
-                BuildExtensionButton("Open extension folder", () =>
-                {
-                    try
+            if (hasCrx)
+            {
+                card.AddRow(MakeRow("Status",
+                    "The installer registered the extension with Chrome and Edge. Restart your browser if it isn't already prompting; you'll see an \"Add extension\" dialog. If your browser blocks the install, fall back to the manual flow below.",
+                    new TextBlock
                     {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        Text = "Registered via HKCU.",
+                        TextWrapping = TextWrapping.Wrap,
+                    }));
+                card.AddRow(MakeRow("Verify",
+                    "Opens chrome://extensions in your default browser so you can confirm the extension is enabled.",
+                    BuildExtensionButton("Open chrome://extensions", async () =>
+                    {
+                        try
                         {
-                            FileName = "explorer.exe",
-                            Arguments = $"\"{extDir}\"",
-                            UseShellExecute = true,
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[BrowserIntegration] open folder failed: {ex.Message}");
-                    }
-                })));
+                            await Windows.System.Launcher.LaunchUriAsync(
+                                new Uri("chrome://extensions/"));
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[BrowserIntegration] launch chrome failed: {ex.Message}");
+                        }
+                    })));
+            }
 
-            card.AddRow(MakeRow("Step 2",
-                "Open Chrome's extensions page, flip on Developer mode, click \"Load unpacked\", then pick the folder from Step 1.",
-                BuildExtensionButton("Open chrome://extensions", async () =>
-                {
-                    try
+            if (hasUnpacked)
+            {
+                var label = hasCrx ? "Manual fallback" : "Install (manual)";
+                var caption = hasCrx
+                    ? "If Chrome refused the registry-based install, drop into Developer mode → Load unpacked → pick this folder."
+                    : "Open the extension folder, then in Chrome go to chrome://extensions, enable Developer mode, click \"Load unpacked\", and pick this folder.";
+                var dirToOpen = unpackedDir;
+                card.AddRow(MakeRow(label, caption,
+                    BuildExtensionButton("Open extension folder", () =>
                     {
-                        await Windows.System.Launcher.LaunchUriAsync(
-                            new Uri("chrome://extensions/"));
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[BrowserIntegration] launch chrome failed: {ex.Message}");
-                    }
-                })));
+                        try
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = "explorer.exe",
+                                Arguments = $"\"{dirToOpen}\"",
+                                UseShellExecute = true,
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[BrowserIntegration] open folder failed: {ex.Message}");
+                        }
+                    })));
+            }
 
             return card;
         }

@@ -56,6 +56,19 @@
 ; If PLUGIN_UNPACKED isn't defined and the path below doesn't exist,
 ; the [Files] #ifdef below silently skips the plugin payload.
 
+; EXTENSION_SRC: unpacked Chrome extension folder (manifest.json at
+; root). When defined, the installer bundles the unpacked tree under
+; {app}\ChromeExtension so the host can offer Load-unpacked.
+;
+; EXTENSION_CRX / EXTENSION_ID / EXTENSION_VERSION: signed .crx file
+; + the extension's ID and version. When all three are defined, the
+; installer also bundles the .crx and registers it with Chrome and
+; Edge via HKCU. Chrome offers to install on next launch (subject to
+; per-browser external-extension policy — see CHROME EXTENSION INSTALL
+; below). EXTENSION_ID is the deterministic 32-char ID derived from
+; the public key the .crx was signed with; EXTENSION_VERSION must
+; match the manifest.json version inside the .crx.
+
 [Setup]
 ; Per-user install under %LOCALAPPDATA%\Programs\RaceCor — no admin
 ; prompt, no UAC, matches the macOS "user-space install" experience.
@@ -93,10 +106,25 @@ CloseApplications=force
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-; SimHub plugin install — visible on the Tasks page so the user knows
-; the installer will touch the SimHub install dir (or where it would,
-; if SimHub isn't installed yet). Default-on; uncheck to skip entirely.
-Name: "simhubplugin"; Description: "Install the RaceCor SimHub plugin (copies DLLs into the SimHub install folder)"; GroupDescription: "SimHub integration:"
+; ── Optional companion installs (default-on, opt-out from the Tasks page) ──
+; SimHub plugin: copies DLLs into the SimHub install dir, see
+;   InstallSimHubPlugin() below.
+; Stream Deck plugin: copies the .sdPlugin folder into Elgato's
+;   plugins dir, see InstallStreamDeckPlugin() below.
+; Chrome extension: writes HKCU\Software\Google\Chrome\Extensions\<id>
+;   so Chrome offers to install on next launch, see [Registry] +
+;   notes in CHROME EXTENSION INSTALL.
+;
+; Each task only fires when its source payload is bundled — uncheck
+; to skip entirely. If a task is unticked, the relevant [Files] /
+; [Registry] / [Code] hook short-circuits.
+Name: "simhubplugin"; Description: "Install the RaceCor SimHub plugin (copies DLLs into the SimHub install folder)"; GroupDescription: "Companion installs:"
+#ifdef HUD_UNPACKED
+Name: "streamdeckplugin"; Description: "Install the RaceCor Stream Deck plugin (copies into Elgato's plugins folder)"; GroupDescription: "Companion installs:"
+#endif
+#ifdef EXTENSION_ID
+Name: "chromeextension"; Description: "Install the RaceCor Chrome extension (Chrome will prompt on next launch)"; GroupDescription: "Companion installs:"
+#endif
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
@@ -122,14 +150,20 @@ Source: "{#PLUGIN_UNPACKED}\*"; DestDir: "{app}\Plugin"; Flags: ignoreversion re
 
 ; ── Chrome extension (optional) ───────────────────────────────
 ; The MV3 "RaceCor iRacing Sync" extension lives in prodrive-server
-; at apps/web/browser-extension/. build.ps1 stages it into
-; installer/staging/ChromeExtension/ when prodrive-server is a
-; sibling checkout, then passes that path via /DEXTENSION_SRC.
-; Bundled under {app}\ChromeExtension so the host can offer
-; "Load unpacked" via Explorer. CI without prodrive-server checked
-; out simply omits the define and skips the payload.
+; at apps/web/browser-extension/. Two payload variants:
+;   EXTENSION_SRC  — unpacked tree, for the host's Load-unpacked
+;                    fallback flow (always bundled when defined).
+;   EXTENSION_CRX  — signed .crx, paired with EXTENSION_ID +
+;                    EXTENSION_VERSION so [Registry] can hand it to
+;                    Chrome for prompt-and-install on next launch.
+;
+; CI without prodrive-server set up simply omits the defines and
+; skips the relevant payloads — the rest of the installer is fine.
 #ifdef EXTENSION_SRC
-Source: "{#EXTENSION_SRC}\*"; DestDir: "{app}\ChromeExtension"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#EXTENSION_SRC}\*"; DestDir: "{app}\ChromeExtension\unpacked"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: chromeextension
+#endif
+#ifdef EXTENSION_CRX
+Source: "{#EXTENSION_CRX}"; DestDir: "{app}\ChromeExtension"; DestName: "racecor-iracing-sync.crx"; Flags: ignoreversion; Tasks: chromeextension
 #endif
 
 [Icons]
@@ -163,6 +197,35 @@ Root: HKCU; Subkey: "Software\Classes\racecor-native"; ValueType: string; ValueN
 Root: HKCU; Subkey: "Software\Classes\racecor-native"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\racecor-native\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",1"
 Root: HKCU; Subkey: "Software\Classes\racecor-native\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
+; ── CHROME EXTENSION INSTALL (registry-based) ────────────────
+; Chrome (and Chromium-based browsers) read external-extension
+; entries under HKCU\Software\<browser>\Extensions\<extension-id>
+; on launch. With `path` and `version` set, the browser locates the
+; .crx and offers to install. Source: https://developer.chrome.com/
+; docs/extensions/how-to/distribute/install-extensions
+;
+; Behaviour by browser as of mid-2024:
+;   - Chrome stable: prompts "Add extension" on next launch IF the
+;     user has Developer Mode enabled OR the extension is on the
+;     Web Store. For pure consumer Chrome with developer mode off,
+;     the extension is silently blocked — fall back to the host's
+;     Load-unpacked card.
+;   - Edge: same behaviour, separate registry hive.
+;   - Brave / Opera / Vivaldi (Chromium): also read these keys.
+;
+; We register both Chrome and Edge so a single .crx ships to both
+; user bases. Per-user (HKCU) install matches our PrivilegesRequired.
+; Tasks: chromeextension gates these so the user can opt out from
+; the Tasks page.
+#ifdef EXTENSION_ID
+#ifdef EXTENSION_VERSION
+Root: HKCU; Subkey: "Software\Google\Chrome\Extensions\{#EXTENSION_ID}"; ValueType: string; ValueName: "path"; ValueData: "{app}\ChromeExtension\racecor-iracing-sync.crx"; Flags: uninsdeletekey; Tasks: chromeextension
+Root: HKCU; Subkey: "Software\Google\Chrome\Extensions\{#EXTENSION_ID}"; ValueType: string; ValueName: "version"; ValueData: "{#EXTENSION_VERSION}"; Tasks: chromeextension
+Root: HKCU; Subkey: "Software\Microsoft\Edge\Extensions\{#EXTENSION_ID}"; ValueType: string; ValueName: "path"; ValueData: "{app}\ChromeExtension\racecor-iracing-sync.crx"; Flags: uninsdeletekey; Tasks: chromeextension
+Root: HKCU; Subkey: "Software\Microsoft\Edge\Extensions\{#EXTENSION_ID}"; ValueType: string; ValueName: "version"; ValueData: "{#EXTENSION_VERSION}"; Tasks: chromeextension
+#endif
+#endif
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
@@ -398,13 +461,55 @@ begin
   end;
 end;
 
+// ─── Stream Deck plugin install ──────────────────────────────────────
+// Stream Deck reads plugins from %APPDATA%\Elgato\StreamDeck\Plugins\.
+// The HUD payload already ships the .sdPlugin folder under
+// {app}\Overlay\streamdeck\racecor\com.k10motorsports.racecor.overlay.sdPlugin
+// (electron-builder.yml includes it). Active install copies that
+// folder into the Stream Deck plugins dir so the action keys appear
+// the next time Stream Deck restarts. If Stream Deck isn't installed
+// yet, leave the source bundled — the host has a "Install Stream Deck
+// plugin" button that re-runs this copy.
+procedure InstallStreamDeckPlugin();
+var
+  pluginsDir: String;
+  srcDir: String;
+  destDir: String;
+begin
+  srcDir := ExpandConstant('{app}\Overlay\streamdeck\racecor\com.k10motorsports.racecor.overlay.sdPlugin');
+  if not DirExists(srcDir) then Exit;
+
+  // Per-user Stream Deck plugins folder. Stream Deck only reads from
+  // here — there's no machine-wide alternative. ExpandConstant
+  // resolves to %APPDATA% (HKCU-equivalent) which matches our
+  // PrivilegesRequired=lowest install posture.
+  pluginsDir := ExpandConstant('{userappdata}\Elgato\StreamDeck\Plugins');
+  if not DirExists(pluginsDir) then
+  begin
+    // Stream Deck not installed yet. Don't error — the .sdPlugin
+    // stays bundled at srcDir and the host can drop it in later
+    // via its "Install Stream Deck plugin" action.
+    Exit;
+  end;
+
+  destDir := pluginsDir + '\com.k10motorsports.racecor.overlay.sdPlugin';
+  // Mirror the whole tree, overwriting an older install in place.
+  // Stream Deck reloads its plugin index on next launch.
+  CopyTreeRecursive(srcDir, destDir);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   // Run the previous-version uninstaller right before our files land,
   // so the user doesn't have to manually uninstall between iterations.
   if CurStep = ssInstall then UninstallPreviousVersion();
 
-  // SimHub plugin install only fires if the user kept the task ticked.
-  if (CurStep = ssPostInstall) and IsTaskSelected('simhubplugin') then
-    InstallSimHubPlugin();
+  // Companion installs fire post-copy and only if their Tasks-page
+  // checkbox is still ticked. Each guards itself against missing
+  // payloads / target apps so an unselected task is a no-op.
+  if CurStep = ssPostInstall then
+  begin
+    if IsTaskSelected('simhubplugin') then InstallSimHubPlugin();
+    if IsTaskSelected('streamdeckplugin') then InstallStreamDeckPlugin();
+  end;
 end;

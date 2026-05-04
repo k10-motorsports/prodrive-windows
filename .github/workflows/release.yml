@@ -100,29 +100,37 @@ jobs:
 
       # ─── Download latest Chrome extension release (optional) ───────
       # prodrive-server publishes via .github/workflows/release-extension.yml,
-      # which attaches `racecor-iracing-sync.zip` to every release tagged
-      # `extension-v*`. If no release exists yet (first installer build
-      # before the extension's first release) we skip silently — the
-      # .iss bundles the payload only when EXTENSION_SRC is non-empty.
+      # which attaches three assets to every release tagged `extension-v*`:
+      #   - racecor-iracing-sync.zip          (unpacked tree)
+      #   - racecor-iracing-sync.crx          (signed for registry install)
+      #   - racecor-iracing-sync.metadata.json (extension id + version)
+      # The unpacked zip drives the host's Load-unpacked card; the .crx
+      # + metadata drive the [Registry] entries that prompt Chrome /
+      # Edge to install on next launch (see CHROME EXTENSION INSTALL
+      # in installer/RaceCorProDrive.iss). Each is independently
+      # optional — missing assets just disable the relevant payload.
       - name: Download latest prodrive-server Chrome extension
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/extension | Out-Null
-          $downloaded = $false
+          $unpackedReady = $false
+          $crxReady = $false
+
+          # Unpacked zip — for the host's Load-unpacked fallback flow.
           try {
             gh release download `
               --repo k10-motorsports/prodrive-server `
               --pattern "racecor-iracing-sync.zip" `
               --dir artifacts/extension
             if ($LASTEXITCODE -eq 0 -and (Test-Path "artifacts/extension/racecor-iracing-sync.zip")) {
-              $downloaded = $true
+              $unpackedReady = $true
             }
           } catch {
-            Write-Host "Chrome extension release not found yet; skipping."
+            Write-Host "Chrome extension zip not found in latest release; skipping unpacked variant."
           }
-          if ($downloaded) {
+          if ($unpackedReady) {
             Expand-Archive -Path artifacts/extension/racecor-iracing-sync.zip `
               -DestinationPath artifacts/extension/unpacked -Force
             # The zip stages a top-level `racecor-iracing-sync/` folder
@@ -132,8 +140,41 @@ jobs:
               throw "Extension zip layout unexpected — manifest.json not found at $extDir"
             }
             "EXTENSION_SRC=$extDir" >> $env:GITHUB_ENV
-          } else {
-            Write-Host "::warning::Chrome extension release not available; installer will ship without {app}\ChromeExtension."
+          }
+
+          # Signed .crx + metadata — for the registry install path.
+          # Both must be present for the registry [Files] / [Registry]
+          # blocks to fire; otherwise we ship without the .crx and the
+          # user falls back to manual Load-unpacked.
+          try {
+            gh release download `
+              --repo k10-motorsports/prodrive-server `
+              --pattern "racecor-iracing-sync.crx" `
+              --dir artifacts/extension
+            gh release download `
+              --repo k10-motorsports/prodrive-server `
+              --pattern "racecor-iracing-sync.metadata.json" `
+              --dir artifacts/extension
+            if ((Test-Path "artifacts/extension/racecor-iracing-sync.crx") -and
+                (Test-Path "artifacts/extension/racecor-iracing-sync.metadata.json")) {
+              $crxReady = $true
+            }
+          } catch {
+            Write-Host "Signed .crx + metadata not found in latest release; skipping registry install path."
+          }
+          if ($crxReady) {
+            $crxPath = (Resolve-Path "artifacts/extension/racecor-iracing-sync.crx").Path
+            $meta = Get-Content "artifacts/extension/racecor-iracing-sync.metadata.json" -Raw | ConvertFrom-Json
+            if (-not $meta.id -or -not $meta.version) {
+              throw "Extension metadata missing id/version fields: $($meta | ConvertTo-Json)"
+            }
+            "EXTENSION_CRX_FILE=$crxPath" >> $env:GITHUB_ENV
+            "EXTENSION_ID=$($meta.id)" >> $env:GITHUB_ENV
+            "EXTENSION_VERSION=$($meta.version)" >> $env:GITHUB_ENV
+          }
+
+          if (-not $unpackedReady -and -not $crxReady) {
+            Write-Host "::warning::Chrome extension release not available; installer will ship without {app}\ChromeExtension and without the registry install."
           }
 
       # ─── Workaround: drop System.Security.Permissions 6.0.0 next to
@@ -245,10 +286,16 @@ jobs:
             "/DHUD_UNPACKED=$env:HUD_UNPACKED",
             "/DPLUGIN_UNPACKED=$env:PLUGIN_UNPACKED"
           )
-          # Chrome extension is optional; only define EXTENSION_SRC
-          # when the download step actually staged a folder.
+          # Chrome extension payloads are optional. The unpacked tree
+          # drives the host's Load-unpacked card; the .crx + id +
+          # version drive the registry-install path.
           if ($env:EXTENSION_SRC) {
             $args += "/DEXTENSION_SRC=$env:EXTENSION_SRC"
+          }
+          if ($env:EXTENSION_CRX_FILE -and $env:EXTENSION_ID -and $env:EXTENSION_VERSION) {
+            $args += "/DEXTENSION_CRX=$env:EXTENSION_CRX_FILE"
+            $args += "/DEXTENSION_ID=$env:EXTENSION_ID"
+            $args += "/DEXTENSION_VERSION=$env:EXTENSION_VERSION"
           }
           & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" @args
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
