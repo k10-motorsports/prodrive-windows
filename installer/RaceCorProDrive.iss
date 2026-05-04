@@ -120,6 +120,18 @@ Source: "{#HUD_UNPACKED}\*"; DestDir: "{app}\Overlay"; Flags: ignoreversion recu
 Source: "{#PLUGIN_UNPACKED}\*"; DestDir: "{app}\Plugin"; Flags: ignoreversion recursesubdirs createallsubdirs
 #endif
 
+; ── Chrome extension (optional) ───────────────────────────────
+; The MV3 "RaceCor iRacing Sync" extension lives in prodrive-server
+; at apps/web/browser-extension/. build.ps1 stages it into
+; installer/staging/ChromeExtension/ when prodrive-server is a
+; sibling checkout, then passes that path via /DEXTENSION_SRC.
+; Bundled under {app}\ChromeExtension so the host can offer
+; "Load unpacked" via Explorer. CI without prodrive-server checked
+; out simply omits the define and skips the payload.
+#ifdef EXTENSION_SRC
+Source: "{#EXTENSION_SRC}\*"; DestDir: "{app}\ChromeExtension"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
+
 [Icons]
 ; Start-menu shortcut is unconditional — there's no good reason to hide
 ; the app from search. Desktop shortcut stays opt-in.

@@ -1,28 +1,33 @@
 # ─────────────────────────────────────────────────────────────────
 # build.ps1 — produce the RaceCor Pro Drive installer.
 #
-# Orchestrates the two builds and feeds them into Inno Setup:
+# Orchestrates the builds and feeds them into Inno Setup:
 #   1. Publish the WinUI host (dotnet publish, win-x64, self-contained).
 #   2. Build the Electron HUD (electron-builder --win --x64 --dir).
-#   3. Run ISCC against installer/RaceCorProDrive.iss with the two
+#   3. Stage the Chrome extension from prodrive-server (optional —
+#      skipped if the repo isn't a sibling).
+#   4. Run ISCC against installer/RaceCorProDrive.iss with the
 #      output paths injected via /D defines.
 #
 # Usage:
-#   pwsh -File installer/build.ps1            # release, both repos
+#   pwsh -File installer/build.ps1            # release, all repos
 #   pwsh -File installer/build.ps1 -SkipHud   # host-only smoke test
 #
-# Assumes the two repos are siblings on disk:
+# Assumes the repos are siblings on disk:
 #   <root>/prodrive-windows/
 #   <root>/prodrive-overlay/
-# Override with -OverlayRepo if your layout differs.
+#   <root>/prodrive-server/   (optional — for the Chrome extension)
+# Override with -OverlayRepo / -ServerRepo if your layout differs.
 # ─────────────────────────────────────────────────────────────────
 
 [CmdletBinding()]
 param(
     [string] $Configuration = 'Release',
     [string] $OverlayRepo   = (Resolve-Path (Join-Path $PSScriptRoot '..\..\prodrive-overlay')),
+    [string] $ServerRepo    = (Join-Path $PSScriptRoot '..\..\prodrive-server'),
     [switch] $SkipHud,
-    [switch] $SkipHost
+    [switch] $SkipHost,
+    [switch] $SkipExtension
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,7 +66,43 @@ if (-not $SkipHud) {
     }
 }
 
-# ── 3. Inno Setup ──
+# ── 3. Chrome extension (optional) ──
+# prodrive-server's apps/web/browser-extension/ is the Manifest V3 source
+# tree. We copy it into a staging dir under installer/ so ISCC can reference
+# it via the EXTENSION_SRC define. If prodrive-server isn't checked out
+# alongside the other repos we silently skip — the .iss file's [Files]
+# section gates the bundle on EXTENSION_SRC being defined.
+$extensionSrc = $null
+if (-not $SkipExtension) {
+    $serverExtDir = $null
+    if (Test-Path $ServerRepo) {
+        $resolved = Resolve-Path $ServerRepo
+        $candidate = Join-Path $resolved 'apps\web\browser-extension'
+        if (Test-Path (Join-Path $candidate 'manifest.json')) {
+            $serverExtDir = $candidate
+        }
+    }
+    if ($serverExtDir) {
+        Write-Host "→ Staging Chrome extension from $serverExtDir…" -ForegroundColor Cyan
+        $extensionSrc = Join-Path $PSScriptRoot 'staging\ChromeExtension'
+        if (Test-Path $extensionSrc) { Remove-Item -Recurse -Force $extensionSrc }
+        New-Item -ItemType Directory -Path $extensionSrc -Force | Out-Null
+        # Copy only what the extension ships — manifest, icons, src.
+        # node_modules / .git / dotfiles MUST be excluded so the installer
+        # stays small.
+        Copy-Item -Path (Join-Path $serverExtDir 'manifest.json') -Destination $extensionSrc
+        foreach ($sub in @('icons', 'src')) {
+            $src = Join-Path $serverExtDir $sub
+            if (Test-Path $src) {
+                Copy-Item -Path $src -Destination $extensionSrc -Recurse
+            }
+        }
+    } else {
+        Write-Host "  (Chrome extension source not found at $ServerRepo\apps\web\browser-extension — skipping)" -ForegroundColor Yellow
+    }
+}
+
+# ── 4. Inno Setup ──
 Write-Host "→ Running ISCC…" -ForegroundColor Cyan
 $iscc = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
 if (-not $iscc) {
@@ -72,7 +113,11 @@ if (-not $iscc) {
 }
 
 $iss = Join-Path $PSScriptRoot 'RaceCorProDrive.iss'
-& $iscc $iss "/DHOST_PUBLISH=$publishDir" "/DHUD_UNPACKED=$hudUnpacked" | Out-Host
+$isccArgs = @($iss, "/DHOST_PUBLISH=$publishDir", "/DHUD_UNPACKED=$hudUnpacked")
+if ($extensionSrc) {
+    $isccArgs += "/DEXTENSION_SRC=$extensionSrc"
+}
+& $iscc @isccArgs | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
 
 $outDir = Join-Path $PSScriptRoot 'output'

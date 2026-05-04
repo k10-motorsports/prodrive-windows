@@ -6,7 +6,7 @@ namespace RaceCorProDrive.Services
 {
     /// <summary>
     /// Strongly-typed mirror of the JSON the Electron HUD reads/writes
-    /// at <c>%APPDATA%\RaceCor.io\overlay-settings.json</c>. Property
+    /// at <c>%APPDATA%\K10 Motorsports\overlay-settings.json</c>. Property
     /// names match the lowerCamelCase keys the HUD's <c>config.js</c>
     /// already emits — the WinUI host is now the canonical writer of
     /// this file, but the HUD still owns the read side, so the schema
@@ -87,7 +87,9 @@ namespace RaceCorProDrive.Services
 
         // ── Recording / replay buffer ──
         [JsonPropertyName("recordingQuality")]            public string? RecordingQuality { get; set; }
-        [JsonPropertyName("recordingMicEnabled")]         public bool? RecordingMicEnabled { get; set; }
+        // Key is "recordingMic" (not "recordingMicEnabled") to match what
+        // the HUD's recorder.js already reads from config.js.
+        [JsonPropertyName("recordingMic")]                public bool? RecordingMicEnabled { get; set; }
         [JsonPropertyName("recordingMicDevice")]          public string? RecordingMicDevice { get; set; }
         // Mic + system-audio volumes stored as 0..1 floats (web slider
         // scales by *100 for display).
@@ -210,7 +212,9 @@ namespace RaceCorProDrive.Services
 
             // Recording
             input.RecordingQuality          ??= "high";
-            input.RecordingMicEnabled       ??= false;
+            // HUD's config.js defaults this to true; mirror so the host
+            // SettingsPage shows the same starting state.
+            input.RecordingMicEnabled       ??= true;
             input.RecordingMicVolume        ??= 0.8;
             input.RecordingSystemVolume     ??= 1.0;
             input.RecordingFacecamSize      ??= "small";

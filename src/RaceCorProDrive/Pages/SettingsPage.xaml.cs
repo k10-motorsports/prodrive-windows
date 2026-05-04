@@ -550,6 +550,92 @@ namespace RaceCorProDrive.Pages
                     () => _settings.AgentKey ?? "",
                     v => _settings.AgentKey = v)));
             AddCard(connection);
+
+            AddCard(BuildBrowserIntegrationCard());
+        }
+
+        // ── Browser integration card ─────────────────────────────
+        //
+        // The Chrome extension ("RaceCor iRacing Sync") is bundled into
+        // the installer at {app}\ChromeExtension when prodrive-server is
+        // available at build time. Chrome doesn't allow programmatic
+        // installation outside the Web Store / enterprise policies, so
+        // the user has to load the unpacked folder themselves. This
+        // card opens the folder in Explorer and Chrome's extensions
+        // page in tandem, then shows the three steps inline so they
+        // never have to leave the host to remember the flow.
+        private SettingsCard BuildBrowserIntegrationCard()
+        {
+            var card = new SettingsCard
+            {
+                Title = "Browser integration",
+                Caption = "Sync your iRacing rating history and race results into Pro Drive automatically.",
+            };
+
+            var extDir = System.IO.Path.Combine(
+                AppContext.BaseDirectory, "ChromeExtension");
+            var manifestPath = System.IO.Path.Combine(extDir, "manifest.json");
+            var bundled = System.IO.File.Exists(manifestPath);
+
+            if (!bundled)
+            {
+                card.AddRow(MakeRow("Status", null,
+                    new TextBlock
+                    {
+                        Text = "Not bundled with this build. Reinstall after the next release to enable.",
+                        TextWrapping = TextWrapping.Wrap,
+                    }));
+                return card;
+            }
+
+            card.AddRow(MakeRow("Step 1", "Open the extension folder, then drag it onto chrome://extensions in the next step.",
+                BuildExtensionButton("Open extension folder", () =>
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = $"\"{extDir}\"",
+                            UseShellExecute = true,
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[BrowserIntegration] open folder failed: {ex.Message}");
+                    }
+                })));
+
+            card.AddRow(MakeRow("Step 2",
+                "Open Chrome's extensions page, flip on Developer mode, click \"Load unpacked\", then pick the folder from Step 1.",
+                BuildExtensionButton("Open chrome://extensions", async () =>
+                {
+                    try
+                    {
+                        await Windows.System.Launcher.LaunchUriAsync(
+                            new Uri("chrome://extensions/"));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[BrowserIntegration] launch chrome failed: {ex.Message}");
+                    }
+                })));
+
+            return card;
+        }
+
+        private static Button BuildExtensionButton(string label, Action onClick)
+        {
+            var btn = new Button { Content = label };
+            btn.Click += (_, __) => onClick();
+            return btn;
+        }
+
+        private static Button BuildExtensionButton(string label, Func<Task> onClick)
+        {
+            var btn = new Button { Content = label };
+            btn.Click += async (_, __) => await onClick();
+            return btn;
         }
 
         // ── Updates card ─────────────────────────────────────────
