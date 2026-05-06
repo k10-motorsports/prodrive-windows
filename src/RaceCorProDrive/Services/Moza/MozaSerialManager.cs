@@ -61,27 +61,27 @@ namespace RaceCorProDrive.Services.Moza
         public IReadOnlyList<MozaDevice> Devices => _devices.Values.ToList().AsReadOnly();
 
         /// <summary>First connected wheelbase, or null.</summary>
-        public MozaDevice Wheelbase => _devices.Values.FirstOrDefault(d =>
+        public MozaDevice? Wheelbase => _devices.Values.FirstOrDefault(d =>
             d.DeviceType == MozaDeviceRegistry.MozaDeviceType.Wheelbase && d.IsConnected);
 
         /// <summary>First connected pedals, or null.</summary>
-        public MozaDevice Pedals => _devices.Values.FirstOrDefault(d =>
+        public MozaDevice? Pedals => _devices.Values.FirstOrDefault(d =>
             d.DeviceType == MozaDeviceRegistry.MozaDeviceType.Pedals && d.IsConnected);
 
         /// <summary>First connected handbrake, or null.</summary>
-        public MozaDevice Handbrake => _devices.Values.FirstOrDefault(d =>
+        public MozaDevice? Handbrake => _devices.Values.FirstOrDefault(d =>
             d.DeviceType == MozaDeviceRegistry.MozaDeviceType.Handbrake && d.IsConnected);
 
         /// <summary>First connected shifter, or null.</summary>
-        public MozaDevice Shifter => _devices.Values.FirstOrDefault(d =>
+        public MozaDevice? Shifter => _devices.Values.FirstOrDefault(d =>
             d.DeviceType == MozaDeviceRegistry.MozaDeviceType.Shifter && d.IsConnected);
 
         /// <summary>First connected dashboard, or null.</summary>
-        public MozaDevice Dashboard => _devices.Values.FirstOrDefault(d =>
+        public MozaDevice? Dashboard => _devices.Values.FirstOrDefault(d =>
             d.DeviceType == MozaDeviceRegistry.MozaDeviceType.Dashboard && d.IsConnected);
 
         /// <summary>First connected steering wheel, or null.</summary>
-        public MozaDevice SteeringWheel => _devices.Values.FirstOrDefault(d =>
+        public MozaDevice? SteeringWheel => _devices.Values.FirstOrDefault(d =>
             d.DeviceType == MozaDeviceRegistry.MozaDeviceType.SteeringWheel && d.IsConnected);
 
         /// <summary>Warning message if Pit House is detected running (serial port conflict).</summary>

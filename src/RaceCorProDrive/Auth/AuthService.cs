@@ -315,7 +315,7 @@ namespace RaceCorProDrive.Auth
 
                 ClearAuthState();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 ClearAuthState();
                 throw;

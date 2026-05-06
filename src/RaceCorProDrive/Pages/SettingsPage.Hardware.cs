@@ -32,13 +32,16 @@ namespace RaceCorProDrive.Pages
         {
             AddCard(BuildConnectionCard());
 
+            // Capture each device into a local so flow analysis
+            // narrows the nullable property reads — the Build*Card
+            // signatures take a non-nullable MozaDevice.
             var mgr = MozaService.Shared.Manager;
-            if (mgr.Wheelbase != null) AddCard(BuildWheelbaseCard(mgr.Wheelbase));
-            if (mgr.Pedals != null)    AddCard(BuildPedalsCard(mgr.Pedals));
-            if (mgr.Handbrake != null) AddCard(BuildHandbrakeCard(mgr.Handbrake));
-            if (mgr.Shifter != null)   AddCard(BuildShifterCard(mgr.Shifter));
-            if (mgr.Dashboard != null) AddCard(BuildDashboardCard(mgr.Dashboard));
-            if (mgr.SteeringWheel != null) AddCard(BuildWheelCard(mgr.SteeringWheel));
+            var wheelbase = mgr.Wheelbase;       if (wheelbase != null)     AddCard(BuildWheelbaseCard(wheelbase));
+            var pedals    = mgr.Pedals;          if (pedals != null)        AddCard(BuildPedalsCard(pedals));
+            var handbrake = mgr.Handbrake;       if (handbrake != null)     AddCard(BuildHandbrakeCard(handbrake));
+            var shifter   = mgr.Shifter;         if (shifter != null)       AddCard(BuildShifterCard(shifter));
+            var dashboard = mgr.Dashboard;       if (dashboard != null)     AddCard(BuildDashboardCard(dashboard));
+            var wheel     = mgr.SteeringWheel;   if (wheel != null)         AddCard(BuildWheelCard(wheel));
         }
 
         // ── Connection card ─────────────────────────────────────────

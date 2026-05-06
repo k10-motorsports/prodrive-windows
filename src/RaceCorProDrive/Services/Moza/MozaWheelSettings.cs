@@ -31,13 +31,13 @@ namespace RaceCorProDrive.Services.Moza
 
         // ── Cached write-only RGB state ───────────────────────────────
         /// <summary>Last-written RPM zone colors (RGB triplets, write-only from firmware).</summary>
-        public byte[] LastRpmZoneColors { get; set; }
+        public byte[]? LastRpmZoneColors { get; set; }
 
         /// <summary>Last-written button colors (RGB triplets, write-only from firmware).</summary>
-        public byte[] LastButtonColors { get; set; }
+        public byte[]? LastButtonColors { get; set; }
 
         /// <summary>Last-written flag indicator colors (RGB triplets, write-only from firmware).</summary>
-        public byte[] LastFlagColors { get; set; }
+        public byte[]? LastFlagColors { get; set; }
 
         /// <summary>True if at least one setting has been read from hardware.</summary>
         public bool HasData => PaddleMode >= 0 || ClutchBitePoint >= 0 || Brightness >= 0;

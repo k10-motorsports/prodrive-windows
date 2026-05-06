@@ -622,7 +622,7 @@ namespace RaceCorProDrive.Pages
 
         private static SolidColorBrush BrushFromHex(string hex)
         {
-            if (string.IsNullOrEmpty(hex) || hex[0] != '#') return new SolidColorBrush(Colors.Transparent);
+            if (string.IsNullOrEmpty(hex) || hex[0] != '#') return new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             string h = hex.Substring(1);
             byte a = 0xFF, r, g, b;
             if (h.Length == 8)
@@ -640,7 +640,7 @@ namespace RaceCorProDrive.Pages
             }
             else
             {
-                return new SolidColorBrush(Colors.Transparent);
+                return new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             }
             return new SolidColorBrush(Color.FromArgb(a, r, g, b));
         }
