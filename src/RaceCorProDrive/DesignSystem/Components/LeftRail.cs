@@ -310,7 +310,11 @@ namespace RaceCorProDrive.DesignSystem.Components
             public enum ButtonStyle { Default, PrimaryAction }
 
             public bool IsAlwaysInactive { get; init; }
-            public ButtonStyle Style { get; init; } = ButtonStyle.Default;
+            // `new` is intentional: this Style is a brand variant
+            // (Default / PrimaryAction) and has nothing to do with
+            // the inherited FrameworkElement.Style xaml resource. The
+            // shadow is fine — every read site is on RailButton.
+            public new ButtonStyle Style { get; init; } = ButtonStyle.Default;
 
             private readonly LucideIcon _icon;
             private readonly Border _bg;

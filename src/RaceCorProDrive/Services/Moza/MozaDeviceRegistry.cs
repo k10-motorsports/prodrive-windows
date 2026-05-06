@@ -362,9 +362,9 @@ namespace RaceCorProDrive.Services.Moza
         public MozaDeviceRegistry.MozaDeviceType DeviceType { get; }
         public Regex Pattern { get; }
         /// <summary>Sub-type hint (e.g., "HPattern" vs "Sequential" for shifters).</summary>
-        public string SubType { get; }
+        public string? SubType { get; }
 
-        public DevicePattern(MozaDeviceRegistry.MozaDeviceType deviceType, Regex pattern, string subType = null)
+        public DevicePattern(MozaDeviceRegistry.MozaDeviceType deviceType, Regex pattern, string? subType = null)
         {
             DeviceType = deviceType;
             Pattern = pattern;

@@ -91,7 +91,7 @@ namespace RaceCorProDrive.Services.Moza
         //  CONSTRUCTION & LIFECYCLE
         // ═══════════════════════════════════════════════════════════════
 
-        public MozaSerialManager(Action<string> logInfo = null, Action<string> logWarn = null)
+        public MozaSerialManager(Action<string>? logInfo = null, Action<string>? logWarn = null)
         {
             _logInfo = logInfo ?? (_ => { });
             _logWarn = logWarn ?? (_ => { });

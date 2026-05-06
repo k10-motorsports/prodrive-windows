@@ -12,6 +12,11 @@ using Windows.UI;
 using RaceCorProDrive.Api;
 using RaceCorProDrive.Support;
 
+// `Path` is ambiguous between Microsoft.UI.Xaml.Shapes.Path (the
+// vector shape we use for the gauge arcs) and System.IO.Path (pulled
+// in by ImplicitUsings). Alias to the shape so BuildArc compiles.
+using XamlPath = Microsoft.UI.Xaml.Shapes.Path;
+
 namespace RaceCorProDrive.Pages
 {
     /// <summary>
@@ -202,7 +207,7 @@ namespace RaceCorProDrive.Pages
             _gaugeBreathe.Begin();
         }
 
-        private Path BuildArc(double startDeg, double endDeg)
+        private XamlPath BuildArc(double startDeg, double endDeg)
         {
             var startPt = PolarToXY(startDeg);
             var endPt = PolarToXY(endDeg);
@@ -222,7 +227,7 @@ namespace RaceCorProDrive.Pages
             var geom = new PathGeometry();
             geom.Figures.Add(fig);
 
-            return new Path { Data = geom };
+            return new XamlPath { Data = geom };
         }
 
         private Point PolarToXY(double deg)
