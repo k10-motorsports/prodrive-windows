@@ -158,16 +158,39 @@ namespace RaceCorProDrive.Services
 #pragma warning disable CS0618 // intentional: backfill obsolete fields so old JSON round-trips
         public static OverlaySettings Apply(OverlaySettings input)
         {
+            // ── Migrations from buggy 0.18.x writes ────────────────
+            // The host briefly stored Zoom as a 0.5..2.0 normalized
+            // scale, but the overlay has always expected a percentage
+            // (50..200). Anything < 5 is by definition a stale
+            // normalized value — promote it to a percentage so the
+            // overlay isn't trying to render at 1% scale.
+            if (input.Zoom is double z && z > 0 && z < 5) input.Zoom = z * 100.0;
+            // Theme "default" was a host-only string the overlay never
+            // had a stylesheet for. Coerce to the overlay's actual
+            // fallback so a user who was on the broken default stops
+            // seeing an unstyled HUD.
+            if (string.Equals(input.Theme, "default", StringComparison.OrdinalIgnoreCase))
+                input.Theme = "dark";
+
             // Display
             input.LogoOnlyStart       ??= true;
             input.LayoutPosition      ??= "top-right";
-            input.Zoom                ??= 1.0;
+            // Zoom is a *percentage* (100 = 100%, 165 = 165%) — the
+            // overlay's settings.js does `(val || 100) / 100`, so a
+            // host-side default of 1.0 collapses the dashboard to 1%
+            // (and a host-set "1.5" reads as 0.015%). Mirror the
+            // overlay's own default of 165 to keep the on-disk file
+            // round-trip-stable.
+            input.Zoom                ??= 165.0;
             input.BottomYOffset       ??= 0;
             input.ShowBorders         ??= false;
             input.ShowWebGL           ??= true;
             input.AmbientMode         ??= "auto";
             input.VisualPreset        ??= "standard";
-            input.Theme               ??= "default";
+            // Overlay's data-theme attribute drives CSS theme rules;
+            // there is no "default" rule, so writing "default" produces
+            // an unstyled overlay. Match the overlay's own fallback.
+            input.Theme               ??= "dark";
 
             // Branding
             input.LogoSubtitle        ??= "";

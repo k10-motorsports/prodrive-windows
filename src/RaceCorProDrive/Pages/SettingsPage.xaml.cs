@@ -187,10 +187,15 @@ namespace RaceCorProDrive.Pages
                     new[] { "top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right", "centered" },
                     () => _settings.LayoutPosition ?? "top-right",
                     v => _settings.LayoutPosition = v)));
-            display.AddRow(MakeSlider("Zoom", null, 0.5, 2.0, 0.05,
-                () => _settings.Zoom ?? 1.0,
-                v => _settings.Zoom = v,
-                "0.00", "x"));
+            // Zoom is stored as a percentage to match the overlay's
+            // wire format (settings.js scales by /100 to produce its
+            // CSS zoom). Storing 1.0 here would render the overlay at
+            // 1% and was the source of "settings don't do anything"
+            // reports up through 0.18.1.
+            display.AddRow(MakeSlider("Zoom", null, 50, 200, 5,
+                () => _settings.Zoom ?? 165.0,
+                v => _settings.Zoom = Math.Round(v),
+                "0", "%"));
             display.AddRow(MakeSlider("Bottom Y offset", "Push the HUD up from the bottom edge.",
                 0, 240, 1,
                 () => _settings.BottomYOffset ?? 0,
@@ -201,10 +206,15 @@ namespace RaceCorProDrive.Pages
                     new[] { ("off", "Off"), ("auto", "Auto"), ("screen", "Screen"), ("wled", "WLED") },
                     () => _settings.AmbientMode ?? "auto",
                     v => _settings.AmbientMode = v)));
+            // Theme strings flow straight to the overlay's
+            // `body[data-theme=…]` attribute — the value must be one
+            // the overlay's CSS actually targets. "dark" / "light" /
+            // "carbon" / "obsidian" / "highvis" are wired up; "default"
+            // produced an unstyled overlay before this fix.
             display.AddRow(MakeRow("Theme", null,
                 MakePicker(
-                    new[] { "default", "carbon", "obsidian", "highvis" },
-                    () => _settings.Theme ?? "default",
+                    new[] { "dark", "light", "carbon", "obsidian", "highvis" },
+                    () => _settings.Theme ?? "dark",
                     v => _settings.Theme = v)));
             display.AddRow(MakeRow("Visual preset", "Density / richness of the rendered HUD.",
                 MakeSegmented(
