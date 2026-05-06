@@ -87,5 +87,16 @@
                             HorizontalAlignment="Right"
                             Margin="0,0,12,0" />
         </Grid>
+
+        <!-- Update banner. Floats just under the title bar (Margin top=44),
+             between the rail (left=72) and the caption-button reserve
+             (right=140). Always shows the current version; expands with
+             status + action button when an update is available, in
+             flight, or has failed. Implementation in
+             DesignSystem/Components/UpdateBanner.cs. -->
+        <components:UpdateBanner x:Name="AppUpdateBanner"
+                                 VerticalAlignment="Top"
+                                 HorizontalAlignment="Stretch"
+                                 Margin="72,44,140,0" />
     </Grid>
 </Window>
