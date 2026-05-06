@@ -184,7 +184,12 @@ namespace RaceCorProDrive.Pages
             display.AddRow(MakeRow("Layout position",
                 "Single-anchor mode. Drag/drop editor in the next release.",
                 MakePicker(
-                    new[] { "top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right", "centered" },
+                    // Pruned to options the overlay's _layoutPositionMap
+                    // actually has CSS coverage for. The hyphenated
+                    // top/bottom-center variants would require new
+                    // dashboard.css rules per panel, so they're out of
+                    // this picker until that work lands.
+                    new[] { "top-left", "top-right", "bottom-left", "bottom-right", "centered" },
                     () => _settings.LayoutPosition ?? "top-right",
                     v => _settings.LayoutPosition = v)));
             // Zoom is stored as a percentage to match the overlay's
@@ -206,6 +211,7 @@ namespace RaceCorProDrive.Pages
                     new[] { ("off", "Off"), ("auto", "Auto"), ("screen", "Screen"), ("wled", "WLED") },
                     () => _settings.AmbientMode ?? "auto",
                     v => _settings.AmbientMode = v)));
+            display.AddRow(BuildAmbientRegionRow());
             // Theme strings flow straight to the overlay's
             // `body[data-theme=…]` attribute — the value must be one
             // the overlay's CSS actually targets. "dark" / "light" /
@@ -1020,6 +1026,70 @@ namespace RaceCorProDrive.Pages
                 await SaveAsync();
             };
             return slider;
+        }
+
+        // ── Ambient capture region row ───────────────────────────────
+        // Shows the current 0..1 rect (or "Not set"), plus a "Pick
+        // region…" button that opens the fullscreen picker and a
+        // "Clear" button. The picker writes _settings.AmbientCaptureRect
+        // and SaveAsync flushes to overlay-settings.json; the overlay's
+        // file watcher then forwards the rect to the C# plugin via
+        // restoreAmbientCapture(). No direct host↔plugin call is needed.
+        private SettingsRow BuildAmbientRegionRow()
+        {
+            var label = new TextBlock
+            {
+                FontSize = 12,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0),
+            };
+            void RefreshLabel()
+            {
+                var r = _settings.AmbientCaptureRect;
+                label.Text = r == null
+                    ? "Not set"
+                    : $"{Math.Round(r.X * 100)}%, {Math.Round(r.Y * 100)}% · {Math.Round(r.W * 100)}% × {Math.Round(r.H * 100)}%";
+            }
+            RefreshLabel();
+
+            var pickBtn = new Button { Content = "Pick region…", Margin = new Thickness(0, 0, 8, 0) };
+            pickBtn.Click += async (_, __) =>
+            {
+                pickBtn.IsEnabled = false;
+                try
+                {
+                    var rect = await AmbientRegionPicker.PickAsync();
+                    if (rect != null)
+                    {
+                        _settings.AmbientCaptureRect = rect;
+                        RefreshLabel();
+                        if (!_suppressSave) await SaveAsync();
+                    }
+                }
+                finally
+                {
+                    pickBtn.IsEnabled = true;
+                }
+            };
+
+            var clearBtn = new Button { Content = "Clear" };
+            clearBtn.Click += async (_, __) =>
+            {
+                _settings.AmbientCaptureRect = null;
+                RefreshLabel();
+                if (!_suppressSave) await SaveAsync();
+            };
+
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            row.Children.Add(label);
+            row.Children.Add(pickBtn);
+            row.Children.Add(clearBtn);
+
+            return MakeRow(
+                "Capture region",
+                "Where on screen the ambient sampler reads colour from. Drag a rectangle over the area of the sim that should drive the lights.",
+                row);
         }
 
         private TextBox MakeTextBox(Func<string> getter, Action<string> setter)

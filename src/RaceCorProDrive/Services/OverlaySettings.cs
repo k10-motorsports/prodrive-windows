@@ -29,6 +29,11 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("showBorders")]     public bool? ShowBorders { get; set; }
         [JsonPropertyName("showWebGL")]       public bool? ShowWebGL { get; set; }
         [JsonPropertyName("ambientMode")]     public string? AmbientMode { get; set; }
+        // Screen-space rectangle (0..1 ratios of the primary display)
+        // that the C# plugin's ScreenColorSampler captures for ambient
+        // light. Written by the host's region picker; the overlay
+        // forwards it to the plugin via setrect HTTP on next applySettings.
+        [JsonPropertyName("ambientCaptureRect")] public AmbientRect? AmbientCaptureRect { get; set; }
         [JsonPropertyName("visualPreset")]    public string? VisualPreset { get; set; }
         [JsonPropertyName("theme")]           public string? Theme { get; set; }
 
@@ -137,6 +142,11 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("rallyMode")]         public bool? RallyMode { get; set; }
         [Obsolete("Force flag was a dev-only toggle. Removed from UI.")]
         [JsonPropertyName("forceFlag")]         public string? ForceFlag { get; set; }
+
+        // ── Ambient capture rect (0..1 ratios of primary display) ──
+        // Stored as nested object so the JSON shape matches what the
+        // overlay's ambient-capture.js already reads from
+        // `_settings.ambientCaptureRect`.
 
         // ── WinUI host extensions (not consumed by the HUD) ──
         // The HUD ignores these on read, so we tuck WinUI-specific
@@ -264,5 +274,19 @@ namespace RaceCorProDrive.Services
             return input;
         }
 #pragma warning restore CS0618
+    }
+
+    /// <summary>
+    /// Rectangle stored as 0..1 ratios of the primary display. The
+    /// overlay's ambient-capture.js consumes this same shape via
+    /// <c>_settings.ambientCaptureRect</c> and forwards it to the C#
+    /// SimHub plugin's ScreenColorSampler endpoint.
+    /// </summary>
+    public sealed class AmbientRect
+    {
+        [JsonPropertyName("x")] public double X { get; set; }
+        [JsonPropertyName("y")] public double Y { get; set; }
+        [JsonPropertyName("w")] public double W { get; set; }
+        [JsonPropertyName("h")] public double H { get; set; }
     }
 }
