@@ -110,7 +110,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; SimHub plugin: copies DLLs into the SimHub install dir, see
 ;   InstallSimHubPlugin() below.
 ; Stream Deck plugin: copies the .sdPlugin folder into Elgato's
-;   plugins dir, see InstallStreamDeckPlugin() below.
+;   plugins dir, see InstallStreamDeckPlugin() below. Only offered
+;   when STREAMDECK_PLUGIN points at a real on-disk .sdPlugin folder
+;   (the overlay's release CI publishes streamdeck-plugin.zip for
+;   exactly this purpose; the asar-buried copy inside HUD_UNPACKED
+;   isn't accessible to a post-install copy step).
 ; Chrome extension: writes HKCU\Software\Google\Chrome\Extensions\<id>
 ;   so Chrome offers to install on next launch, see [Registry] +
 ;   notes in CHROME EXTENSION INSTALL.
@@ -119,10 +123,18 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; to skip entirely. If a task is unticked, the relevant [Files] /
 ; [Registry] / [Code] hook short-circuits.
 Name: "simhubplugin"; Description: "Install the RaceCor SimHub plugin (copies DLLs into the SimHub install folder)"; GroupDescription: "Companion installs:"
-#ifdef HUD_UNPACKED
+#ifdef STREAMDECK_PLUGIN
 Name: "streamdeckplugin"; Description: "Install the RaceCor Stream Deck plugin (copies into Elgato's plugins folder)"; GroupDescription: "Companion installs:"
 #endif
-#ifdef EXTENSION_ID
+; The chromeextension task fires whenever ANY extension payload is
+; bundled — whether the unpacked tree (for the host's Load-unpacked
+; fallback card) or the signed .crx (for the registry-install path)
+; or both. Previously the task was only declared when EXTENSION_ID
+; was set, so an extension release without a signed .crx
+; (e.g. prodrive-server extension-v0.3.1, which shipped only .zip)
+; produced [Files] entries that referenced an undeclared task and
+; the unpacked payload silently dropped on the floor.
+#if defined(EXTENSION_ID) || defined(EXTENSION_SRC)
 Name: "chromeextension"; Description: "Install the RaceCor Chrome extension (Chrome will prompt on next launch)"; GroupDescription: "Companion installs:"
 #endif
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
@@ -146,6 +158,14 @@ Source: "{#HUD_UNPACKED}\*"; DestDir: "{app}\Overlay"; Flags: ignoreversion recu
 ; release). Local build.ps1 runs leave it out.
 #ifdef PLUGIN_UNPACKED
 Source: "{#PLUGIN_UNPACKED}\*"; DestDir: "{app}\Plugin"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
+
+; ── Stream Deck plugin (optional) ─────────────────────────────
+; Bundled as a real on-disk .sdPlugin folder (NOT extracted from
+; the overlay's resources/app.asar). The post-install code below
+; copies this into %APPDATA%\Elgato\StreamDeck\Plugins\.
+#ifdef STREAMDECK_PLUGIN
+Source: "{#STREAMDECK_PLUGIN}\*"; DestDir: "{app}\StreamDeckPlugin\com.k10motorsports.racecor.overlay.sdPlugin"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: streamdeckplugin
 #endif
 
 ; ── Chrome extension (optional) ───────────────────────────────
@@ -463,20 +483,23 @@ end;
 
 // ─── Stream Deck plugin install ──────────────────────────────────────
 // Stream Deck reads plugins from %APPDATA%\Elgato\StreamDeck\Plugins\.
-// The HUD payload already ships the .sdPlugin folder under
-// {app}\Overlay\streamdeck\racecor\com.k10motorsports.racecor.overlay.sdPlugin
-// (electron-builder.yml includes it). Active install copies that
-// folder into the Stream Deck plugins dir so the action keys appear
-// the next time Stream Deck restarts. If Stream Deck isn't installed
-// yet, leave the source bundled — the host has a "Install Stream Deck
-// plugin" button that re-runs this copy.
+// The .sdPlugin ships as a real on-disk folder at
+// {app}\StreamDeckPlugin\com.k10motorsports.racecor.overlay.sdPlugin
+// (CI bundles it from the overlay's streamdeck-plugin.zip artifact —
+// the in-asar copy under {app}\Overlay\... is invisible to file
+// operations and was the reason 0.18.x silently no-op'd this step).
+// Active install copies that folder into the Stream Deck plugins dir
+// so the action keys appear the next time Stream Deck restarts. If
+// Stream Deck isn't installed yet, leave the source bundled — the
+// host has a "Install Stream Deck plugin" button that re-runs this
+// copy.
 procedure InstallStreamDeckPlugin();
 var
   pluginsDir: String;
   srcDir: String;
   destDir: String;
 begin
-  srcDir := ExpandConstant('{app}\Overlay\streamdeck\racecor\com.k10motorsports.racecor.overlay.sdPlugin');
+  srcDir := ExpandConstant('{app}\StreamDeckPlugin\com.k10motorsports.racecor.overlay.sdPlugin');
   if not DirExists(srcDir) then Exit;
 
   // Per-user Stream Deck plugins folder. Stream Deck only reads from
