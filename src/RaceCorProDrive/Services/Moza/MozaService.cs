@@ -26,9 +26,20 @@ namespace RaceCorProDrive.Services.Moza
 
         private MozaService()
         {
+            // Pipe both levels through MozaLogBuffer so the Hardware
+            // settings console can show them live, while still echoing
+            // to Debug.WriteLine for attached-debugger sessions.
             Manager = new MozaSerialManager(
-                logInfo: msg => Debug.WriteLine($"[Moza] {msg}"),
-                logWarn: msg => Debug.WriteLine($"[Moza] WARN {msg}"));
+                logInfo: msg =>
+                {
+                    MozaLogBuffer.Shared.Info(msg);
+                    Debug.WriteLine($"[Moza] {msg}");
+                },
+                logWarn: msg =>
+                {
+                    MozaLogBuffer.Shared.Warn(msg);
+                    Debug.WriteLine($"[Moza] WARN {msg}");
+                });
         }
 
         /// <summary>

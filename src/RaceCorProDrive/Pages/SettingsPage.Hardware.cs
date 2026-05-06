@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -42,6 +44,13 @@ namespace RaceCorProDrive.Pages
             var shifter   = mgr.Shifter;         if (shifter != null)       AddCard(BuildShifterCard(shifter));
             var dashboard = mgr.Dashboard;       if (dashboard != null)     AddCard(BuildDashboardCard(dashboard));
             var wheel     = mgr.SteeringWheel;   if (wheel != null)         AddCard(BuildWheelCard(wheel));
+
+            // Always last — the live serial console for diagnosing
+            // detection / FFB-write failures without attaching a
+            // debugger. Shows whatever the Moza poll thread emits via
+            // logInfo / logWarn (was previously dropping into the void
+            // via Debug.WriteLine; piped through MozaLogBuffer now).
+            AddCard(BuildMozaConsoleCard());
         }
 
         // ── Connection card ─────────────────────────────────────────
@@ -520,6 +529,131 @@ namespace RaceCorProDrive.Pages
                 deviceId,
                 cmd,
                 (byte)Math.Clamp(value, 0, 255));
+        }
+
+        // ── Console card ─────────────────────────────────────────────
+        // Live tail of MozaSerialManager's logInfo / logWarn callbacks.
+        // Read-only TextBox in monospace so users can select+copy lines
+        // when reporting issues. Auto-scrolls to bottom on new entries
+        // unless the user has scrolled up — at which point we leave
+        // them parked. Clear empties the buffer (and the textbox).
+        private SettingsCard BuildMozaConsoleCard()
+        {
+            var card = new SettingsCard
+            {
+                Title = "Console",
+                Caption = "Live serial log from the Moza poll thread. Useful when a device isn't being detected or settings aren't taking — paste the relevant lines into a bug report.",
+            };
+
+            var box = new TextBox
+            {
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                IsSpellCheckEnabled = false,
+                TextWrapping = TextWrapping.NoWrap,
+                FontFamily = new FontFamily("Consolas, Cascadia Mono, Courier New, monospace"),
+                FontSize = 11,
+                MinHeight = 200,
+                MaxHeight = 320,
+                Margin = new Thickness(0, 0, 0, 8),
+                // Slightly darker than the surrounding card so it reads
+                // as a terminal pane.
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Black) { Opacity = 0.45 },
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gainsboro),
+            };
+            ScrollViewer.SetVerticalScrollBarVisibility(box, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(box, ScrollBarVisibility.Auto);
+
+            // Initial render from the in-memory snapshot so the box has
+            // history when the page loads, not just lines emitted while
+            // it's open.
+            var sb = new StringBuilder();
+            foreach (var e in MozaLogBuffer.Shared.Snapshot()) sb.AppendLine(FormatEntry(e));
+            box.Text = sb.ToString();
+
+            // Track whether the user has scrolled away from the bottom.
+            // If they have, don't yank them back when new lines arrive —
+            // they're reading something. The textbox raises SelectionChanged
+            // when the caret moves, but the cleaner signal is the inner
+            // ScrollViewer's offset; we approximate via "is caret at end?".
+            bool autoFollow = true;
+
+            void Append(MozaLogBuffer.Entry e)
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    box.Text += FormatEntry(e) + "\r\n";
+                    if (autoFollow)
+                    {
+                        box.SelectionStart = box.Text.Length;
+                        box.SelectionLength = 0;
+                    }
+                });
+            }
+
+            void Wipe()
+            {
+                DispatcherQueue.TryEnqueue(() => box.Text = string.Empty);
+            }
+
+            EventHandler<MozaLogBuffer.Entry> onEntry = (_, e) => Append(e);
+            EventHandler onCleared = (_, __) => Wipe();
+            MozaLogBuffer.Shared.EntryAdded += onEntry;
+            MozaLogBuffer.Shared.Cleared += onCleared;
+            // Detach when the textbox leaves the visual tree so we
+            // don't keep ghost subscriptions accumulating each time
+            // the Hardware category is re-rendered (every navigate
+            // back into Settings does a fresh BuildCategory).
+            box.Unloaded += (_, __) =>
+            {
+                MozaLogBuffer.Shared.EntryAdded -= onEntry;
+                MozaLogBuffer.Shared.Cleared -= onCleared;
+            };
+
+            // SelectionChanged fires whenever the caret moves; treat
+            // "caret not at end" as the user manually scrolling/clicking
+            // somewhere historic and pause auto-follow.
+            box.SelectionChanged += (_, __) =>
+            {
+                autoFollow = box.SelectionStart >= box.Text.Length - 2;
+            };
+
+            card.AddRow(box);
+
+            var clearBtn = new Button
+            {
+                Content = "Clear",
+                Margin = new Thickness(0, 0, 8, 0),
+            };
+            clearBtn.Click += (_, __) => MozaLogBuffer.Shared.Clear();
+
+            var jumpBtn = new Button
+            {
+                Content = "Jump to bottom",
+            };
+            jumpBtn.Click += (_, __) =>
+            {
+                autoFollow = true;
+                box.SelectionStart = box.Text.Length;
+                box.SelectionLength = 0;
+            };
+
+            var btnRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 0,
+            };
+            btnRow.Children.Add(clearBtn);
+            btnRow.Children.Add(jumpBtn);
+            card.AddRow(btnRow);
+
+            return card;
+        }
+
+        private static string FormatEntry(MozaLogBuffer.Entry e)
+        {
+            var tag = e.Level == MozaLogBuffer.LogLevel.Warn ? "WARN" : "INFO";
+            return $"{e.At:HH:mm:ss.fff}  {tag,-4}  {e.Message}";
         }
     }
 }
