@@ -49,6 +49,23 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # Stamp the tag version into the .csproj so the published assembly
+      # reports the same version the installer ships. Without this step
+      # the assembly stays at the dev-time placeholder ("0.1.0"), which
+      # makes UpdateService think every release is newer than what's
+      # installed — the app then re-downloads + re-runs the installer
+      # on every launch, forever.
+      - name: Stamp assembly version
+        shell: pwsh
+        run: |
+          $csproj = "src/RaceCorProDrive/RaceCorProDrive.csproj"
+          $v = "${{ steps.version.outputs.VERSION }}"
+          $xml = Get-Content $csproj -Raw
+          $patched = [regex]::Replace($xml, '<Version>[^<]*</Version>', "<Version>$v</Version>")
+          if ($patched -eq $xml) { throw "Failed to stamp <Version> in $csproj — element not found" }
+          Set-Content -Path $csproj -Value $patched -NoNewline
+          Write-Host "Stamped $csproj with <Version>$v</Version>"
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
@@ -97,6 +114,32 @@ jobs:
           Expand-Archive -Path artifacts/overlay/overlay-win-unpacked.zip `
             -DestinationPath artifacts/overlay/unpacked -Force
           "HUD_UNPACKED=$((Resolve-Path artifacts/overlay/unpacked).Path)" >> $env:GITHUB_ENV
+
+          # Stream Deck plugin ships as a separate artifact so the
+          # installer can copy a real .sdPlugin folder into Elgato's
+          # plugins dir. Without this, electron-builder's asar bundling
+          # makes the .sdPlugin invisible to the post-install step and
+          # the install silently no-ops.
+          try {
+            gh release download `
+              --repo k10-motorsports/prodrive-overlay `
+              --pattern "streamdeck-plugin.zip" `
+              --dir artifacts/overlay
+            if (Test-Path "artifacts/overlay/streamdeck-plugin.zip") {
+              Expand-Archive -Path artifacts/overlay/streamdeck-plugin.zip `
+                -DestinationPath artifacts/overlay/streamdeck -Force
+              # The zip stages a top-level
+              # `com.k10motorsports.racecor.overlay.sdPlugin/` folder.
+              $sdDir = Join-Path (Resolve-Path artifacts/overlay/streamdeck) 'com.k10motorsports.racecor.overlay.sdPlugin'
+              if (Test-Path (Join-Path $sdDir 'manifest.json')) {
+                "STREAMDECK_PLUGIN=$sdDir" >> $env:GITHUB_ENV
+              } else {
+                Write-Host "::warning::streamdeck-plugin.zip layout unexpected — manifest.json not at $sdDir; skipping Stream Deck install."
+              }
+            }
+          } catch {
+            Write-Host "::warning::Stream Deck plugin not found in latest overlay release; installer will ship without it."
+          }
 
       # ─── Download latest Chrome extension release (optional) ───────
       # prodrive-server publishes via .github/workflows/release-extension.yml,
@@ -289,6 +332,9 @@ jobs:
           # Chrome extension payloads are optional. The unpacked tree
           # drives the host's Load-unpacked card; the .crx + id +
           # version drive the registry-install path.
+          if ($env:STREAMDECK_PLUGIN) {
+            $args += "/DSTREAMDECK_PLUGIN=$env:STREAMDECK_PLUGIN"
+          }
           if ($env:EXTENSION_SRC) {
             $args += "/DEXTENSION_SRC=$env:EXTENSION_SRC"
           }

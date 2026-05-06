@@ -56,6 +56,17 @@ namespace RaceCorProDrive.Services
         // racing rigs are usually unattended; getting the latest fix
         // overnight is friendlier than asking each time.
         public const string SettingKey_AutoUpdate = "racecor.host.autoUpdate";
+        // Tracks the last version we asked the OS to install. If the
+        // running assembly still reports an older version on next
+        // launch (e.g. CI didn't stamp the version → assembly stays at
+        // the dev placeholder), we treat that as a failed install
+        // attempt and refuse to retry the same target version. Without
+        // this guard a broken stamp puts the app in a download/install
+        // loop on every poll. The retry cooldown unblocks legitimate
+        // re-attempts after 24h.
+        private const string SettingKey_LastInstallTarget = "racecor.host.lastInstallTarget";
+        private const string SettingKey_LastInstallAt     = "racecor.host.lastInstallAt";
+        private static readonly TimeSpan ReinstallCooldown = TimeSpan.FromHours(24);
         // Re-poll the GitHub API every hour while the app is running.
         // GitHub allows 60 anonymous requests/hour per IP; once an hour
         // is well under any reasonable cap.
@@ -136,10 +147,35 @@ namespace RaceCorProDrive.Services
         private async Task CheckAndMaybeInstallAsync(bool forceInstall = false)
         {
             await CheckForUpdateAsync().ConfigureAwait(false);
-            if (UpdateAvailable && (AutoUpdateEnabled || forceInstall))
+            if (!UpdateAvailable) return;
+            if (!AutoUpdateEnabled && !forceInstall) return;
+
+            // Defense-in-depth against the 0.18.1-style install loop:
+            // if we already tried to install this same LatestVersion in
+            // the last 24h and the current assembly still doesn't match
+            // it, the previous install didn't stick (broken version
+            // stamp, UAC declined, antivirus quarantine, etc.). Retrying
+            // immediately just spawns the installer over and over,
+            // interrupting whatever the user is doing. forceInstall
+            // bypasses the cooldown so the manual "Install" button
+            // always works.
+            if (!forceInstall && JustTriedThisVersion(LatestVersion))
             {
-                await DownloadAndInstallAsync().ConfigureAwait(false);
+                Debug.WriteLine($"[Update] suppressing auto-install of {LatestVersion}: same target attempted within {ReinstallCooldown.TotalHours:0}h");
+                return;
             }
+
+            // Don't interrupt a session. If iRacing (or anything that
+            // pushes telemetry to the plugin) is live, defer until the
+            // next hourly poll. forceInstall still wins so the user can
+            // explicitly opt in mid-session.
+            if (!forceInstall && IRacingDetector.Shared.IsRunning)
+            {
+                Debug.WriteLine("[Update] deferring install: iRacing is running");
+                return;
+            }
+
+            await DownloadAndInstallAsync().ConfigureAwait(false);
         }
 
         private async Task CheckForUpdateAsync()
@@ -177,6 +213,18 @@ namespace RaceCorProDrive.Services
                     DownloadUrl = PickAsset(release.Assets, arch) ?? PickAsset(release.Assets, null);
                     UpdateAvailable = !string.IsNullOrEmpty(DownloadUrl)
                         && IsNewerVersion(LatestVersion, CurrentVersion);
+
+                    // Clear the "just tried" marker once the running
+                    // assembly catches up. Without this, the cooldown
+                    // would lock out a future legitimate update to a
+                    // newer version that happens to also collide with
+                    // a previously-failed target.
+                    var lastTarget = AppSettings.Get(SettingKey_LastInstallTarget);
+                    if (!string.IsNullOrEmpty(lastTarget) && !IsNewerVersion(lastTarget, CurrentVersion))
+                    {
+                        AppSettings.Remove(SettingKey_LastInstallTarget);
+                        AppSettings.Remove(SettingKey_LastInstallAt);
+                    }
                 }
                 LastCheckedAt = DateTime.UtcNow;
             }
@@ -240,6 +288,16 @@ namespace RaceCorProDrive.Services
                     }
                 }
 
+                // Mark this version as "we tried to install it" BEFORE
+                // launching the installer. If the installer succeeds,
+                // the relaunched app's CheckForUpdateAsync clears the
+                // marker (the version on disk now matches). If it
+                // fails / is cancelled / silently no-ops, the marker
+                // stays and JustTriedThisVersion() suppresses the next
+                // hour's retry — breaking the loop.
+                AppSettings.Set(SettingKey_LastInstallTarget, LatestVersion);
+                AppSettings.Set(SettingKey_LastInstallAt, DateTime.UtcNow.ToString("O"));
+
                 // Inno Setup is a normal Windows .exe — ShellExecute
                 // gives the OS the option of UAC-prompting. The installer
                 // can self-handle "running app needs to close" via its
@@ -297,6 +355,22 @@ namespace RaceCorProDrive.Services
             return null;
         }
 
+        // True if we already attempted the same target version inside
+        // the cooldown window. Prevents the auto-installer loop when a
+        // build's stamped assembly version doesn't actually match the
+        // tag (or the install otherwise can't take).
+        private static bool JustTriedThisVersion(string? candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate)) return false;
+            var lastTarget = AppSettings.Get(SettingKey_LastInstallTarget);
+            if (string.IsNullOrEmpty(lastTarget)) return false;
+            if (!string.Equals(lastTarget, candidate, StringComparison.OrdinalIgnoreCase)) return false;
+            var lastAtRaw = AppSettings.Get(SettingKey_LastInstallAt);
+            if (string.IsNullOrEmpty(lastAtRaw)) return false;
+            if (!DateTime.TryParse(lastAtRaw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var lastAt)) return false;
+            return (DateTime.UtcNow - lastAt) < ReinstallCooldown;
+        }
+
         private static bool IsNewerVersion(string? remote, string local)
         {
             if (string.IsNullOrWhiteSpace(remote)) return false;
@@ -308,11 +382,16 @@ namespace RaceCorProDrive.Services
             {
                 return false;
             }
+            // System.Version requires at least major.minor; pad short
+            // versions out to major.minor.build so "1.0" parses and
+            // compares correctly against "1.0.5".
             static string Pad(string v)
             {
                 var parts = v.Split('.');
-                while (parts.Length < 3) v += ".0";
-                return v;
+                if (parts.Length >= 3) return v;
+                var padded = new string[3];
+                for (int i = 0; i < 3; i++) padded[i] = i < parts.Length ? parts[i] : "0";
+                return string.Join('.', padded);
             }
         }
 
