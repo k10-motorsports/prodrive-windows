@@ -81,6 +81,7 @@ namespace RaceCorProDrive.DesignSystem
     public static class LucideIconKind
     {
         public const string Dashboard    = "layout-dashboard";
+        public const string PitWall      = "launcher-option-1-gauge";
         public const string Dna          = "dna";
         public const string When         = "calendar-clock";
         public const string Tracks       = "map-pin";

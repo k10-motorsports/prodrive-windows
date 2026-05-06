@@ -107,6 +107,7 @@ namespace RaceCorProDrive
             Type pageType = tag switch
             {
                 "dashboard" => typeof(DashboardPage),
+                "pitwall" => typeof(PitWallPage),
                 "library" => typeof(LibraryPage),
                 "editor" => typeof(EditorPage),
                 "races" => typeof(SessionsPage),

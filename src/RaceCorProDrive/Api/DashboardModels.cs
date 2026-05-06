@@ -36,6 +36,22 @@ namespace RaceCorProDrive.Api
         [JsonPropertyName("recentSessions")]    public List<RecentSession>? RecentSessions { get; set; }
         [JsonPropertyName("previousRaces")]     public List<PreviousRaceCard>? PreviousRaces { get; set; }
 
+        // ── Pit Wall metrics ──
+        // The four load-bearing platform metrics defined in
+        // `agents/prodrive-context/glossary.md`:
+        //   Composure  — rolling iR delta per incident-point.
+        //   Heat       — short-window form indicator.
+        //   Streaks    — current run + longest slump / surge.
+        //   Discipline — per-category mix with per-discipline Composure.
+        // Vocabulary rule: every member name and any string the user can
+        // see uses racing-native terms. No finance vocabulary anywhere.
+        [JsonPropertyName("composure")]        public ComposureResult? Composure { get; set; }
+        [JsonPropertyName("heat")]             public HeatResult? Heat { get; set; }
+        [JsonPropertyName("streaks")]          public StreaksResult? Streaks { get; set; }
+        [JsonPropertyName("disciplineMix")]    public DisciplineMixResult? DisciplineMix { get; set; }
+        [JsonPropertyName("composureSeries")]  public ComposureSeriesResult? ComposureSeries { get; set; }
+        [JsonPropertyName("trajectory")]       public TrajectoryResult? Trajectory { get; set; }
+
         // ── Convenience accessors (match the Swift extensions) ──
 
         public int TotalRaces    => Stats.TotalRaces;
@@ -436,5 +452,108 @@ namespace RaceCorProDrive.Api
         [JsonPropertyName("createdAt")]            public DateTime CreatedAt { get; set; }
 
         public string DisplayName => DiscordDisplayName ?? DiscordUsername ?? Email ?? "Racer";
+    }
+
+    // ── Pit Wall metrics ──────────────────────────────────────────────────
+    // Wire shape mirrors `apps/web-api/src/calc/composure.ts`. Every native
+    // client (Swift / C#) carries the same fields verbatim.
+
+    public class ComposureResult
+    {
+        [JsonPropertyName("sampleSize")]          public int SampleSize { get; set; }
+        [JsonPropertyName("score")]               public int Score { get; set; }
+        /// "gritty" | "steady" | "sharp" | "untouchable"
+        [JsonPropertyName("band")]                public string Band { get; set; } = "steady";
+        [JsonPropertyName("iRatingDeltaSum")]     public int IRatingDeltaSum { get; set; }
+        [JsonPropertyName("incidentSum")]         public int IncidentSum { get; set; }
+        [JsonPropertyName("avgIncidents")]        public double AvgIncidents { get; set; }
+        [JsonPropertyName("iRatingPerIncident")]  public double? IRatingPerIncident { get; set; }
+        /// "improving" | "declining" | "stable" | "new"
+        [JsonPropertyName("trend")]               public string Trend { get; set; } = "new";
+    }
+
+    public class HeatResult
+    {
+        [JsonPropertyName("sampleSize")]          public int SampleSize { get; set; }
+        [JsonPropertyName("iRatingDeltaSum")]     public int IRatingDeltaSum { get; set; }
+        [JsonPropertyName("iRatingDeltaAvg")]     public double IRatingDeltaAvg { get; set; }
+        [JsonPropertyName("avgIncidents")]        public double AvgIncidents { get; set; }
+        /// "hot" | "warm" | "flat" | "cold"
+        [JsonPropertyName("direction")]           public string Direction { get; set; } = "flat";
+    }
+
+    public class StreakSpan
+    {
+        [JsonPropertyName("length")]              public int Length { get; set; }
+        [JsonPropertyName("startDate")]           public string StartDate { get; set; } = "";
+        [JsonPropertyName("endDate")]             public string EndDate { get; set; } = "";
+        [JsonPropertyName("iRatingDeltaSum")]     public int IRatingDeltaSum { get; set; }
+        [JsonPropertyName("incidentSum")]         public int IncidentSum { get; set; }
+    }
+
+    public class CurrentStreak
+    {
+        /// "gaining" | "losing" | "flat"
+        [JsonPropertyName("kind")]                public string Kind { get; set; } = "flat";
+        [JsonPropertyName("span")]                public StreakSpan Span { get; set; } = new();
+    }
+
+    public class StreaksResult
+    {
+        [JsonPropertyName("current")]             public CurrentStreak? Current { get; set; }
+        [JsonPropertyName("longestSlump")]        public StreakSpan? LongestSlump { get; set; }
+        [JsonPropertyName("longestSurge")]        public StreakSpan? LongestSurge { get; set; }
+    }
+
+    public class DisciplineSlice
+    {
+        [JsonPropertyName("category")]            public string Category { get; set; } = "";
+        [JsonPropertyName("count")]               public int Count { get; set; }
+        [JsonPropertyName("proportion")]          public double Proportion { get; set; }
+        [JsonPropertyName("iRatingDeltaSum")]     public int IRatingDeltaSum { get; set; }
+        [JsonPropertyName("incidentSum")]         public int IncidentSum { get; set; }
+        [JsonPropertyName("avgIncidents")]        public double AvgIncidents { get; set; }
+        [JsonPropertyName("composure")]           public ComposureResult Composure { get; set; } = new();
+    }
+
+    public class DisciplineMixResult
+    {
+        [JsonPropertyName("total")]               public int Total { get; set; }
+        [JsonPropertyName("byCategory")]          public List<DisciplineSlice> ByCategory { get; set; } = new();
+        [JsonPropertyName("primary")]             public string? Primary { get; set; }
+        [JsonPropertyName("bestForRating")]       public string? BestForRating { get; set; }
+    }
+
+    public class ComposureSeriesPoint
+    {
+        [JsonPropertyName("date")]                public string Date { get; set; } = "";
+        [JsonPropertyName("score")]               public int Score { get; set; }
+        [JsonPropertyName("band")]                public string Band { get; set; } = "steady";
+        [JsonPropertyName("sampleSize")]          public int SampleSize { get; set; }
+    }
+
+    public class ComposureSeriesResult
+    {
+        [JsonPropertyName("points")]              public List<ComposureSeriesPoint> Points { get; set; } = new();
+        [JsonPropertyName("minScore")]            public int MinScore { get; set; }
+        [JsonPropertyName("maxScore")]            public int MaxScore { get; set; } = 100;
+    }
+
+    public class TrajectoryHorizon
+    {
+        [JsonPropertyName("days")]                public int Days { get; set; }
+        [JsonPropertyName("expectedDelta")]       public int ExpectedDelta { get; set; }
+        [JsonPropertyName("variance")]            public int Variance { get; set; }
+    }
+
+    public class TrajectoryResult
+    {
+        [JsonPropertyName("iRatingPerRace")]      public double IRatingPerRace { get; set; }
+        [JsonPropertyName("racesPerWeek")]        public double RacesPerWeek { get; set; }
+        [JsonPropertyName("stdDevPerRace")]       public double StdDevPerRace { get; set; }
+        /// "climbing" | "falling" | "plateau"
+        [JsonPropertyName("direction")]           public string Direction { get; set; } = "plateau";
+        [JsonPropertyName("sampleSize")]          public int SampleSize { get; set; }
+        [JsonPropertyName("horizons")]            public List<TrajectoryHorizon> Horizons { get; set; } = new();
     }
 }

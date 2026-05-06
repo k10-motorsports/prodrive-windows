@@ -42,6 +42,7 @@ namespace RaceCorProDrive.DesignSystem.Components
         public static readonly IReadOnlyList<Destination> Destinations = new[]
         {
             new Destination { Key = "dashboard", Label = "Dashboard", IconKind = LucideIconKind.Dashboard },
+            new Destination { Key = "pitwall",   Label = "Pit Wall",  IconKind = LucideIconKind.PitWall },
             new Destination { Key = "dna",       Label = "DNA",       IconKind = LucideIconKind.Dna },
             new Destination { Key = "when",      Label = "When",      IconKind = LucideIconKind.When },
             new Destination { Key = "tracks",    Label = "Tracks",    IconKind = LucideIconKind.Tracks },

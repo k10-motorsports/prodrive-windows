@@ -1,0 +1,343 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.PitWallPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:design="using:RaceCorProDrive.DesignSystem"
+    xmlns:components="using:RaceCorProDrive.DesignSystem.Components"
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
+
+    <!--
+        Pit Wall — the at-a-glance racing-paddock surface.
+
+        Layout matches the web app at /drive/pit-wall:
+          • hero strip with headline copy
+          • headline panel pairing the Composure gauge with Heat + Streak tiles
+          • streak history (longest slump | longest surge)
+          • discipline mix bar with embedded per-discipline composure scores
+          • generated insight footer
+
+        Page sits inside the same titlebar-rail-content frame the rest of
+        the app uses: 72pt left margin to clear the floating LeftRail and
+        a 44pt top spacer for the titlebar slot. No tabs/filters in the
+        titlebar for this page — it's a single composed surface.
+
+        Vocabulary anchored in `agents/prodrive-context/glossary.md`. No
+        finance terminology in any user-visible string.
+    -->
+
+    <Grid>
+        <Grid Margin="72,0,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollMode="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="32,16,32,32">
+                <StackPanel Spacing="20" MaxWidth="1280" HorizontalAlignment="Stretch">
+
+                    <!-- Hero -->
+                    <Grid x:Name="HeroPanel"
+                          CornerRadius="14"
+                          BorderThickness="1"
+                          Padding="28,24"
+                          Background="#16161E"
+                          BorderBrush="#2A2A36">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="PIT WALL"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       CharacterSpacing="280"
+                                       Foreground="#888899" />
+                            <TextBlock Text="The State of Your Wheel"
+                                       FontSize="32"
+                                       FontWeight="Bold"
+                                       Foreground="#F2F2F8" />
+                            <TextBlock x:Name="HeadlineText"
+                                       Text="Race once to light up the wall."
+                                       FontSize="15"
+                                       MaxWidth="780"
+                                       TextWrapping="Wrap"
+                                       Foreground="#B8B8C8" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Headline panel: gauge + side stack -->
+                    <Grid CornerRadius="14"
+                          BorderThickness="1"
+                          BorderBrush="#2A2A36"
+                          Background="#15151D"
+                          Padding="32,28">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Gauge -->
+                        <StackPanel Grid.Column="0" Spacing="14" Width="280" HorizontalAlignment="Center">
+                            <Grid Width="240" Height="240">
+                                <!-- Outer breathing glow -->
+                                <Ellipse x:Name="GaugeGlow"
+                                         Width="240" Height="240"
+                                         Fill="#3DFF5A47"
+                                         Opacity="0.25" />
+                                <!-- Track + fill arcs are drawn into a Canvas in code-behind -->
+                                <Canvas x:Name="GaugeCanvas" Width="240" Height="240" />
+                                <!-- Centre readout -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock x:Name="GaugeScoreText"
+                                               Text="—"
+                                               FontSize="60"
+                                               FontWeight="Bold"
+                                               Foreground="#888899"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock Text="COMPOSURE"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               CharacterSpacing="220"
+                                               Foreground="#888899"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock x:Name="GaugeBandText"
+                                               Text="No sample"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="#888899"
+                                               HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                            <Border CornerRadius="999"
+                                    BorderThickness="1"
+                                    BorderBrush="#446377"
+                                    Padding="12,4"
+                                    HorizontalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock x:Name="TrendGlyph" Text="·" FontSize="16" FontWeight="Bold" Foreground="#94A3B8" />
+                                    <TextBlock x:Name="TrendLabel" Text="NEW" FontSize="11" FontWeight="Bold" CharacterSpacing="200" Foreground="#94A3B8" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock x:Name="WindowCaption"
+                                       Text="Awaiting first race"
+                                       FontSize="12"
+                                       Foreground="#9090A2"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- Right stack -->
+                        <StackPanel Grid.Column="1" Margin="32,0,0,0" Spacing="12">
+
+                            <!-- Heat tile -->
+                            <Border x:Name="HeatTile"
+                                    CornerRadius="10"
+                                    BorderThickness="1"
+                                    BorderBrush="#2A2A36"
+                                    Background="#1A1A24"
+                                    Padding="18,14">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="56" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Left">
+                                        <Ellipse x:Name="HeatPulseRing" Width="40" Height="40" Fill="#94A3B8" Opacity="0.3" />
+                                        <Ellipse x:Name="HeatPulseDot"  Width="14" Height="14" Fill="#94A3B8" />
+                                    </Grid>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="HEAT" FontSize="10" FontWeight="SemiBold"
+                                                   CharacterSpacing="220" Foreground="#888899" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock x:Name="HeatLabel" Text="—" FontSize="22" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <TextBlock x:Name="HeatGlyph" Text="" FontSize="14" FontWeight="Bold" Foreground="#94A3B8" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="HeatCaption" Text="Awaiting first race"
+                                                   FontSize="12" Foreground="#9090A2" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Current streak tile -->
+                            <Border x:Name="CurrentStreakTile"
+                                    CornerRadius="10"
+                                    BorderThickness="1"
+                                    BorderBrush="#2A2A36"
+                                    Background="#1A1A24"
+                                    Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="CURRENT" FontSize="10" FontWeight="SemiBold"
+                                                   CharacterSpacing="220" Foreground="#888899" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock x:Name="StreakKindGlyph" Text="·" FontSize="20" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <TextBlock x:Name="StreakKindLabel" Text="Holding" FontSize="20" FontWeight="Bold" Foreground="#94A3B8" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="StreakLengthText"
+                                                   Text="—"
+                                                   FontSize="36"
+                                                   FontWeight="Bold"
+                                                   Foreground="#F2F2F8"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock x:Name="StreakDetailText"
+                                                   Text="no streak"
+                                                   FontSize="12"
+                                                   Foreground="#9090A2"
+                                                   HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Streak history -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                CornerRadius="10"
+                                BorderThickness="1"
+                                BorderBrush="#2A2A36"
+                                Background="#15151D"
+                                Margin="0,0,8,0"
+                                Padding="18,14">
+                            <StackPanel x:Name="LongestSlumpStack" Spacing="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="LONGEST SLUMP" FontSize="10" FontWeight="SemiBold"
+                                               CharacterSpacing="180" Foreground="#888899" />
+                                    <TextBlock Grid.Column="1" x:Name="SlumpGlyph" Text="▼" FontSize="14"
+                                               FontWeight="Bold" Foreground="#888899" />
+                                </Grid>
+                                <TextBlock x:Name="SlumpEmptyText"
+                                           Text="No losing streaks in the window — clean run."
+                                           FontSize="13"
+                                           Foreground="#9090A2"
+                                           Visibility="Visible" />
+                                <Grid x:Name="SlumpDetailGrid" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" x:Name="SlumpLengthText" Text="—"
+                                               FontSize="28" FontWeight="Bold" Foreground="#F2F2F8" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" x:Name="SlumpRacesLabel" Text="races"
+                                               FontSize="13" Foreground="#9090A2" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+                                    <TextBlock Grid.Column="3" x:Name="SlumpDeltaText" Text="—"
+                                               FontSize="14" FontWeight="Bold" Foreground="#FF5A47" VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBlock x:Name="SlumpDateText" Text="" FontSize="11" Foreground="#888899" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                CornerRadius="10"
+                                BorderThickness="1"
+                                BorderBrush="#2A2A36"
+                                Background="#15151D"
+                                Margin="8,0,0,0"
+                                Padding="18,14">
+                            <StackPanel x:Name="LongestSurgeStack" Spacing="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="LONGEST SURGE" FontSize="10" FontWeight="SemiBold"
+                                               CharacterSpacing="180" Foreground="#888899" />
+                                    <TextBlock Grid.Column="1" x:Name="SurgeGlyph" Text="▲" FontSize="14"
+                                               FontWeight="Bold" Foreground="#888899" />
+                                </Grid>
+                                <TextBlock x:Name="SurgeEmptyText"
+                                           Text="No consecutive gains yet — your next race could start one."
+                                           FontSize="13"
+                                           Foreground="#9090A2"
+                                           Visibility="Visible" />
+                                <Grid x:Name="SurgeDetailGrid" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" x:Name="SurgeLengthText" Text="—"
+                                               FontSize="28" FontWeight="Bold" Foreground="#F2F2F8" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" x:Name="SurgeRacesLabel" Text="races"
+                                               FontSize="13" Foreground="#9090A2" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+                                    <TextBlock Grid.Column="3" x:Name="SurgeDeltaText" Text="—"
+                                               FontSize="14" FontWeight="Bold" Foreground="#4ADE80" VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBlock x:Name="SurgeDateText" Text="" FontSize="11" Foreground="#888899" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Discipline mix -->
+                    <Border CornerRadius="10"
+                            BorderThickness="1"
+                            BorderBrush="#2A2A36"
+                            Background="#15151D"
+                            Padding="22,16">
+                        <StackPanel Spacing="12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="DISCIPLINE MIX" FontSize="10" FontWeight="SemiBold"
+                                           CharacterSpacing="220" Foreground="#888899" />
+                                <TextBlock Grid.Column="1" x:Name="MixTotalText" Text="—"
+                                           FontSize="11" Foreground="#888899" />
+                            </Grid>
+
+                            <Grid x:Name="DisciplineBarHost"
+                                  Height="44"
+                                  CornerRadius="6"
+                                  Background="#0F0F18"
+                                  BorderThickness="1"
+                                  BorderBrush="#23232E">
+                                <StackPanel x:Name="DisciplineBarStack" Orientation="Horizontal" />
+                            </Grid>
+
+                            <ItemsControl x:Name="DisciplineLegendList">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+
+                            <TextBlock x:Name="MixHeadlineText"
+                                       Text=""
+                                       FontSize="13"
+                                       Foreground="#C8C8D6"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Footnote -->
+                    <TextBlock x:Name="FootnoteText"
+                               Text=""
+                               FontSize="11"
+                               Foreground="#888899"
+                               HorizontalAlignment="Center"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>
