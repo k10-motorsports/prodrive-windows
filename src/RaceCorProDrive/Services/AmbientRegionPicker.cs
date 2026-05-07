@@ -247,7 +247,11 @@ namespace RaceCorProDrive.Services
             // without requiring the user to click first.
             rootHost.Focus(FocusState.Programmatic);
 
-            return tcs.Task;
+            // Await rather than `return tcs.Task` — this method is async
+            // (CaptureScreenAsync was awaited above), so a Task<T> return
+            // would be wrapped into Task<Task<T>>. Awaiting unwraps to
+            // the actual AmbientRect? the caller expects.
+            return await tcs.Task;
         }
 
         // ── Win32 GDI screen capture ───────────────────────────────
