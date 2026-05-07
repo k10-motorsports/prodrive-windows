@@ -9,6 +9,8 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.Graphics;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 using WinRT.Interop;
 
 namespace RaceCorProDrive.Services
@@ -29,7 +31,7 @@ namespace RaceCorProDrive.Services
     /// </summary>
     public static class AmbientRegionPicker
     {
-        public static Task<AmbientRect?> PickAsync()
+        public static async Task<AmbientRect?> PickAsync()
         {
             var tcs = new TaskCompletionSource<AmbientRect?>();
 
@@ -38,10 +40,14 @@ namespace RaceCorProDrive.Services
 
             // Capture the screen FIRST (before our window is on screen)
             // so we don't end up screenshotting our own dim layer.
-            WriteableBitmap? screenshot = null;
+            // BitmapImage path is more reliable across CsWinRT runtimes
+            // than poking the WriteableBitmap pixel buffer directly via
+            // IBufferByteAccess COM interop, which silently produced an
+            // empty buffer on some setups (the user saw "all black").
+            BitmapImage? screenshot = null;
             try
             {
-                screenshot = CaptureScreen(bounds.Width, bounds.Height);
+                screenshot = await CaptureScreenAsync(bounds.Width, bounds.Height);
             }
             catch
             {
@@ -94,9 +100,12 @@ namespace RaceCorProDrive.Services
                 root.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0x10, 0x10, 0x10));
             }
 
+            // Light dim so the screenshot is still legible; before this
+            // tweak the overlay was dark enough that the user couldn't
+            // see what they were selecting.
             var dim = new Border
             {
-                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0x88, 0x00, 0x00, 0x00)),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0x40, 0x00, 0x00, 0x00)),
             };
             root.Children.Add(dim);
 
@@ -242,11 +251,41 @@ namespace RaceCorProDrive.Services
         }
 
         // ── Win32 GDI screen capture ───────────────────────────────
-        // Uses BitBlt against the desktop DC. Returns a WriteableBitmap
-        // sized to the requested width/height in BGRA8 pixel format.
-        // Works on both x64 and arm64 — IntPtr handles both archs.
+        // Uses BitBlt against the desktop DC, then encodes the captured
+        // bytes as PNG into an in-memory stream and decodes them as a
+        // BitmapImage. Goes through BitmapEncoder rather than poking
+        // WriteableBitmap.PixelBuffer because the latter requires an
+        // IBufferByteAccess COM cast that can't be reliably obtained
+        // from a CsWinRT-projected IBuffer — that path silently
+        // produced an empty buffer on the user's machine, leading to
+        // an all-black region picker.
 
-        private static WriteableBitmap CaptureScreen(int width, int height)
+        private static async Task<BitmapImage> CaptureScreenAsync(int width, int height)
+        {
+            var pixelBytes = CaptureScreenBytes(width, height);
+
+            var stream = new InMemoryRandomAccessStream();
+            var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+            // Bgra8 + Ignore alpha: GDI 32bpp DIBs are BGRX (alpha byte
+            // unused), and PNG's alpha channel doesn't make sense for
+            // an opaque desktop screenshot. Ignore tells the encoder to
+            // treat alpha bytes as padding rather than transparency.
+            encoder.SetPixelData(
+                BitmapPixelFormat.Bgra8,
+                BitmapAlphaMode.Ignore,
+                (uint)width,
+                (uint)height,
+                96.0, 96.0,
+                pixelBytes);
+            await encoder.FlushAsync();
+            stream.Seek(0);
+
+            var bmp = new BitmapImage();
+            await bmp.SetSourceAsync(stream);
+            return bmp;
+        }
+
+        private static byte[] CaptureScreenBytes(int width, int height)
         {
             var desktopDc = GetDC(IntPtr.Zero);
             var memDc = CreateCompatibleDC(desktopDc);
@@ -272,21 +311,7 @@ namespace RaceCorProDrive.Services
 
                 var pixelBytes = new byte[width * height * 4];
                 GetDIBits(memDc, bmp, 0, (uint)height, pixelBytes, ref bmi, 0);
-
-                // GDI's 32bpp DIB leaves the alpha byte zeroed. WriteableBitmap's
-                // PixelBuffer is BGRA8 with premultiplied alpha, so a=0 renders
-                // every pixel fully transparent. Force opaque before upload.
-                for (int i = 3; i < pixelBytes.Length; i += 4) pixelBytes[i] = 0xFF;
-
-                var wb = new WriteableBitmap(width, height);
-                // WinUI 3 has no built-in stream extension on IBuffer, so
-                // grab the underlying byte pointer via the COM interop
-                // interface and Marshal.Copy directly. This avoids
-                // depending on System.Runtime.WindowsRuntime extensions.
-                var bba = (IBufferByteAccess)(object)wb.PixelBuffer;
-                Marshal.Copy(pixelBytes, 0, bba.Buffer, pixelBytes.Length);
-                wb.Invalidate();
-                return wb;
+                return pixelBytes;
             }
             finally
             {
@@ -341,17 +366,6 @@ namespace RaceCorProDrive.Services
             public BITMAPINFOHEADER bmiHeader;
             // bmiColors[1] not needed for 32bpp — biCompression=0 + 32bpp
             // means the pixel format is fixed and the palette is unused.
-        }
-
-        // COM-interop interface that exposes the raw byte pointer behind
-        // an IBuffer (e.g. WriteableBitmap.PixelBuffer). The GUID matches
-        // the WinRT Windows.Storage.Streams.IBufferByteAccess contract.
-        [ComImport]
-        [Guid("905a0fef-bc53-11df-8c49-001e4fc686da")]
-        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        private interface IBufferByteAccess
-        {
-            IntPtr Buffer { get; }
         }
     }
 }
