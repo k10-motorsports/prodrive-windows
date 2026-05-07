@@ -181,6 +181,19 @@ namespace RaceCorProDrive.Services
             // seeing an unstyled HUD.
             if (string.Equals(input.Theme, "default", StringComparison.OrdinalIgnoreCase))
                 input.Theme = "dark";
+            // Earlier host versions saved SimHubUrl as bare host:port
+            // ("http://localhost:8889"). The plugin endpoint lives at
+            // /racecor-io-pro-drive/ — without it the renderer fetches
+            // the SimHub root, gets a non-JSON response, and every
+            // panel sits at zero. Append the path on read so old saves
+            // self-heal. Anything that already contains the path or
+            // points at a different host (remote SimHub) is left alone.
+            if (!string.IsNullOrEmpty(input.SimHubUrl)
+                && !input.SimHubUrl.Contains("/racecor-io-pro-drive", StringComparison.OrdinalIgnoreCase))
+            {
+                var trimmed = input.SimHubUrl.TrimEnd('/');
+                input.SimHubUrl = trimmed + "/racecor-io-pro-drive/";
+            }
 
             // Display
             input.LogoOnlyStart       ??= true;
@@ -265,7 +278,12 @@ namespace RaceCorProDrive.Services
             input.IracingDataSync  ??= true;
             input.ApiBase          ??= "https://prodrive.racecor.io";
             input.UseRemoteTokens  ??= false;
-            input.SimHubUrl        ??= "http://localhost:8889";
+            // Must include the plugin path — the overlay's poll-engine
+            // hits this URL directly and SimHub root returns the host
+            // page, not the plugin's JSON. If only the host:port lands
+            // here, the renderer falls back to the canonical URL it
+            // already has in config.js.
+            input.SimHubUrl        ??= "http://localhost:8889/racecor-io-pro-drive/";
 
             // Host
             input.WinUIAutoLaunchHud  ??= false;
