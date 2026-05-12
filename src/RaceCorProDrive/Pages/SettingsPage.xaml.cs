@@ -36,6 +36,13 @@ namespace RaceCorProDrive.Pages
         private bool _suppressSave;
         private DispatcherTimer? _saveStatusTimer;
 
+        // Recording-tab preview. Created in BuildRecordingSection, then
+        // poked via RefreshVideoPreview() after any setter that affects
+        // the composed frame. Held as a field rather than re-fetched
+        // because SaveAsync round-trips are self-write-suppressed and
+        // don't trigger BuildCategory.
+        private VideoPreviewView? _videoPreview;
+
         // Category tab strip — lives in MainWindow's titlebar slot
         // while this page is loaded. Built in OnLoaded, cleared from
         // the slot in OnUnloaded.
@@ -119,6 +126,11 @@ namespace RaceCorProDrive.Pages
             LeftColumn.Children.Clear();
             RightColumn.Children.Clear();
             _pendingCards.Clear();
+            // The recording preview only lives on the Recording tab.
+            // Clearing here means RefreshVideoPreview() is a no-op when
+            // settings change while the user is on another tab (e.g.
+            // a hotkey-driven external save while Visual is open).
+            _videoPreview = null;
             // The Updates card subscribes to UpdateService.PropertyChanged
             // and caches DOM refs. Detach before rebuild so a stale
             // closure doesn't fire onto orphaned TextBlocks the next
@@ -408,12 +420,26 @@ namespace RaceCorProDrive.Pages
 
         private void BuildRecordingSection()
         {
+            // Live preview of the composed video frame. Created first
+            // so the setters below can refresh it. The card sits in
+            // the normal column-flow; whichever column is shorter at
+            // FlushColumns time grabs it.
+            _videoPreview = new VideoPreviewView();
+            _videoPreview.Apply(_settings);
+            var preview = new SettingsCard
+            {
+                Title = "Preview",
+                Caption = "How the recorded video will look. Game capture fills the frame; facecam and the in-game HUD sit on top — pick non-overlapping corners.",
+            };
+            preview.AddRow(_videoPreview);
+            AddCard(preview);
+
             var capture = new SettingsCard { Title = "Capture", Caption = "Output quality + auto-record behavior." };
             capture.AddRow(MakeRow("Quality", null,
                 MakeSegmented(
                     new[] { ("low", "Low"), ("medium", "Medium"), ("high", "High"), ("ultra", "Ultra") },
                     () => _settings.RecordingQuality ?? "high",
-                    v => _settings.RecordingQuality = v)));
+                    v => { _settings.RecordingQuality = v; RefreshVideoPreview(); })));
             capture.AddRow(MakeToggleRow("Auto-record",
                 "Start recording when a session begins, stop at the end.",
                 () => _settings.RecordingAutoRecord ?? false,
@@ -456,12 +482,12 @@ namespace RaceCorProDrive.Pages
                 new DevicePickerRow(
                     Windows.Devices.Enumeration.DeviceClass.VideoCapture,
                     () => _settings.RecordingWebcamDevice ?? "",
-                    v => _settings.RecordingWebcamDevice = v)));
+                    v => { _settings.RecordingWebcamDevice = v; RefreshVideoPreview(); })));
             facecam.AddRow(MakeRow("Size", null,
                 MakeSegmented(
                     new[] { ("small", "Small"), ("medium", "Medium"), ("large", "Large") },
                     () => _settings.RecordingFacecamSize ?? "small",
-                    v => _settings.RecordingFacecamSize = v)));
+                    v => { _settings.RecordingFacecamSize = v; RefreshVideoPreview(); })));
             facecam.AddRow(MakeRow("Position", null,
                 MakeSegmented(
                     new[]
@@ -470,7 +496,7 @@ namespace RaceCorProDrive.Pages
                         ("bottom-left", "BL"), ("bottom-right", "BR"),
                     },
                     () => _settings.RecordingFacecamPos ?? "bottom-right",
-                    v => _settings.RecordingFacecamPos = v)));
+                    v => { _settings.RecordingFacecamPos = v; RefreshVideoPreview(); })));
             AddCard(facecam);
 
             var output = new SettingsCard { Title = "Output", Caption = "File format + encoder selection." };
@@ -478,12 +504,12 @@ namespace RaceCorProDrive.Pages
                 MakeSegmented(
                     new[] { ("mp4", "MP4"), ("mkv", "MKV"), ("mov", "MOV") },
                     () => _settings.RecordingOutputFormat ?? "mp4",
-                    v => _settings.RecordingOutputFormat = v)));
+                    v => { _settings.RecordingOutputFormat = v; RefreshVideoPreview(); })));
             output.AddRow(MakeRow("Encoder", null,
                 MakeSegmented(
                     new[] { ("auto", "Auto"), ("h264", "H.264"), ("h265", "H.265"), ("av1", "AV1") },
                     () => _settings.RecordingEncoder ?? "auto",
-                    v => _settings.RecordingEncoder = v)));
+                    v => { _settings.RecordingEncoder = v; RefreshVideoPreview(); })));
             output.AddRow(MakeToggleRow("Delete source after transcode",
                 "Save space by removing the raw capture once the encoded file lands.",
                 () => _settings.RecordingDeleteSource ?? true,
@@ -859,6 +885,17 @@ namespace RaceCorProDrive.Pages
             _updateProgress.Visibility = svc.IsDownloading
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        }
+
+        // ── Recording preview refresh ────────────────────────────────
+        // Wraps the null check so the inline setter lambdas in
+        // BuildRecordingSection stay one-liners. Safe to call from any
+        // category — if the user is on a different tab, _videoPreview
+        // is null and this is a no-op.
+        private void RefreshVideoPreview()
+        {
+            if (_suppressSave) return;
+            _videoPreview?.Apply(_settings);
         }
 
         // ── Two-column card layout ───────────────────────────────────
