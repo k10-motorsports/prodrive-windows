@@ -114,7 +114,7 @@ namespace RaceCorProDrive
                 "moments" => typeof(PlaceholderPage),
                 "tracks" => typeof(PlaceholderPage),
                 "cars" => typeof(PlaceholderPage),
-                "dna" => typeof(PlaceholderPage),
+                "dna" => typeof(DnaPage),
                 "when" => typeof(PlaceholderPage),
                 "safety" => typeof(PlaceholderPage),
                 "composure" => typeof(PlaceholderPage),
