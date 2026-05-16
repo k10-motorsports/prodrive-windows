@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.Auth;
 using RaceCorProDrive.DesignSystem;
+using RaceCorProDrive.Diagnostics;
 using RaceCorProDrive.Services;
 using RaceCorProDrive.Support;
 
@@ -93,6 +94,14 @@ namespace RaceCorProDrive
                 // surfaces the new version in Settings → System.
                 Services.UpdateService.Shared.Start();
                 BootTrace("UpdateService started");
+
+                // LAN-exposed diagnostic surface. Opt-in via
+                // racecor.diag.enabled (default ON); writes the bound
+                // port + URLs into the JSONL log on start so a remote
+                // watcher can discover the endpoint just by reading
+                // the freshest /diag/info entry.
+                Diagnostics.DiagServer.Shared.Start();
+                BootTrace($"DiagServer state: running={Diagnostics.DiagServer.Shared.IsRunning} bind={Diagnostics.DiagServer.Shared.BindAddress} port={Diagnostics.DiagServer.Shared.Port}");
 
                 // Process any URI captured during initial launch (rare; usually
                 // OAuth comes back via redirected activation while we're already
@@ -232,6 +241,7 @@ namespace RaceCorProDrive
                     $"[{DateTime.Now:O}] PID={Environment.ProcessId} {msg}{Environment.NewLine}");
             }
             catch { }
+            try { DiagLog.Info("app.lifecycle", msg); } catch { }
         }
 
         private static string GetBaseUrl()
@@ -249,6 +259,7 @@ namespace RaceCorProDrive
                     $"[{DateTime.Now:O}] {source}{Environment.NewLine}{ex}{Environment.NewLine}{Environment.NewLine}");
             }
             catch { /* logging failures shouldn't make crashes worse */ }
+            try { DiagLog.Exception($"crash.{source}", ex); } catch { }
         }
     }
 }
