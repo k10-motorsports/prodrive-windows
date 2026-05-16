@@ -239,7 +239,7 @@ namespace RaceCorProDrive.Pages
             return grid;
         }
 
-        private static UIElement BuildAxisBreakdown(DriverDNAData d)
+        private static FrameworkElement BuildAxisBreakdown(DriverDNAData d)
         {
             // Same axes + order as the radar (keeps the two visuals
             // reading top-to-bottom in lockstep).
