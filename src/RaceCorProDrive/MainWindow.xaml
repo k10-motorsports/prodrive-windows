@@ -13,21 +13,16 @@
         theme.
 
         Layout uses z-order, NOT rows: the active page Frame fills the
-        whole window so its livery photo + content extend to y=0. The
-        LeftRail floats on top as a 72pt acrylic glass column hugging
-        the left edge — it lives in the *window* chrome (not in any
-        page) so navigating between pages animates only the page's
-        content, leaving the rail in place. AppTitleBar floats on top
-        as a transparent 32pt drag region that hosts the system caption
-        buttons (min/max/close).
+        whole window so its content extends to y=0. The LeftRail floats
+        on top as a 72pt acrylic glass column hugging the left edge —
+        it lives in the *window* chrome (not in any page) so navigating
+        between pages animates only the page's content, leaving the
+        rail in place. AppTitleBar floats on top as a transparent 32pt
+        drag region that hosts the system caption buttons
+        (min/max/close).
     -->
     <Grid Background="{ThemeResource ApplicationBackgroundThemeBrush}"
           RequestedTheme="Dark">
-
-        <!-- App-level themed backdrop. Hoisted out of individual pages
-             so the livery photo is set once at sign-in and stays put
-             across navigations — no flicker, no per-page re-fade. -->
-        <design:ThemedBackgroundControl x:Name="AppBackground" />
 
         <!-- Authed shell: page Frame fills the whole window. Pages
              reserve their left 72pt for the floating rail by adding

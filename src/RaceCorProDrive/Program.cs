@@ -5,6 +5,7 @@ using System.Threading;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using RaceCorProDrive.Diagnostics;
 using WinRT;
 
 namespace RaceCorProDrive
@@ -24,6 +25,11 @@ namespace RaceCorProDrive
         [STAThread]
         public static int Main(string[] args)
         {
+            // Start the structured diagnostic logger before anything
+            // else so even the earliest startup failure lands in the
+            // JSONL stream. boot.log stays as-is — same record gets
+            // duplicated to both surfaces.
+            DiagLog.Start();
             BootLog("entry");
 
             try
@@ -75,6 +81,7 @@ namespace RaceCorProDrive
             {
                 BootLog($"FATAL: {ex.GetType().FullName}: {ex.Message}");
                 BootLog(ex.ToString());
+                DiagLog.Exception("app.boot", ex, "fatal in Main");
                 return 1;
             }
         }
@@ -155,6 +162,7 @@ namespace RaceCorProDrive
                     $"[{DateTime.Now:O}] PID={Process.GetCurrentProcess().Id} {msg}{Environment.NewLine}");
             }
             catch { /* never throw from logger */ }
+            try { DiagLog.Info("app.boot", msg); } catch { }
         }
     }
 }
