@@ -96,12 +96,20 @@ namespace RaceCorProDrive.Services
         // the HUD's recorder.js already reads from config.js.
         [JsonPropertyName("recordingMic")]                public bool? RecordingMicEnabled { get; set; }
         [JsonPropertyName("recordingMicDevice")]          public string? RecordingMicDevice { get; set; }
+        // Friendly device label written alongside the WinRT id. The Electron
+        // overlay can't resolve a WinRT DeviceInformation.Id against its own
+        // Chromium MediaDevices enumeration (different namespaces entirely),
+        // so it matches by label instead. Falls back to label substring match
+        // when the camera's display name has a suffix like "(USB Video)".
+        [JsonPropertyName("recordingMicLabel")]           public string? RecordingMicLabel { get; set; }
         // Mic + system-audio volumes stored as 0..1 floats (web slider
         // scales by *100 for display).
         [JsonPropertyName("recordingMicVolume")]          public double? RecordingMicVolume { get; set; }
         [JsonPropertyName("recordingSystemAudioDevice")]  public string? RecordingSystemAudioDevice { get; set; }
+        [JsonPropertyName("recordingSystemAudioLabel")]   public string? RecordingSystemAudioLabel { get; set; }
         [JsonPropertyName("recordingSystemVolume")]       public double? RecordingSystemVolume { get; set; }
         [JsonPropertyName("recordingWebcamDevice")]       public string? RecordingWebcamDevice { get; set; }
+        [JsonPropertyName("recordingWebcamLabel")]        public string? RecordingWebcamLabel { get; set; }
         [JsonPropertyName("recordingFacecamSize")]        public string? RecordingFacecamSize { get; set; }
         [JsonPropertyName("recordingFacecamPos")]         public string? RecordingFacecamPos { get; set; }
         [JsonPropertyName("recordingOutputFormat")]       public string? RecordingOutputFormat { get; set; }
@@ -115,6 +123,19 @@ namespace RaceCorProDrive.Services
         // older HUD reads "replayBufferSeconds" (int). Keep both;
         // SaveAsync mirrors the new value to both.
         [JsonPropertyName("replayBufferDuration")]        public string? ReplayBufferDuration { get; set; }
+
+        // Migration toggle: which process owns the live recording pipeline.
+        //   "electron" (default) — the Electron overlay's renderer + main captures and writes the file
+        //   "native"             — the WinUI host's NativeRecordingService captures via FFmpeg
+        // The overlay reads this and, when "native", routes start/stop calls
+        // to the host's loopback control server instead of doing local capture.
+        // Plan: docs/recording-migration.md.
+        [JsonPropertyName("recordingBackend")]            public string? RecordingBackend { get; set; }
+        // Loopback port the host's RecordingControlServer is bound to.
+        // Written by the host on startup; read by the overlay's
+        // delegation path. Lives in the same settings file so we don't
+        // need a second discovery channel.
+        [JsonPropertyName("hostControlPort")]             public int? HostControlPort { get; set; }
 
         // ── System ──
         [JsonPropertyName("iracingDataSync")]   public bool? IracingDataSync { get; set; }
@@ -273,6 +294,9 @@ namespace RaceCorProDrive.Services
             input.ReplayBufferEnabled       ??= false;
             input.ReplayBufferSeconds       ??= 30;
             input.ReplayBufferDuration      ??= "30";
+            // Default to the working Electron pipeline; native is opt-in
+            // until proven on real hardware.
+            input.RecordingBackend          ??= "electron";
 
             // System
             input.IracingDataSync  ??= true;
