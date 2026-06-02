@@ -1,0 +1,67 @@
+<Page
+    x:Class="RaceCorProDrive.Pages.DnaPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
+    <!--
+        Driver DNA page. Reads from DashboardPoller.Shared.Latest
+        (the same singleton the dashboard uses) so the radar, axis
+        breakdown, and archetype description all reflect the
+        server-computed driverDNA + driverArchetype objects already
+        present on the Dashboard payload. No extra fetch.
+
+        Layout mirrors SettingsPage chrome: LeftRail clears 72pt on
+        the left, the 44pt titlebar slot at top is left empty (this
+        page has no tabs), then a page header + scrollable body.
+    -->
+
+    <Grid RequestedTheme="Dark" Margin="72,0,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Hairline under titlebar. -->
+        <Border Grid.Row="1"
+                Height="1"
+                Background="{StaticResource BorderSubtleBrush}" />
+
+        <Grid Grid.Row="2" Padding="40,24,40,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Page header (eyebrow + title + caption). -->
+            <StackPanel Grid.Row="0" Orientation="Vertical" Spacing="4" Margin="0,0,0,20">
+                <TextBlock FontSize="11"
+                           FontWeight="Bold"
+                           CharacterSpacing="200"
+                           Foreground="{StaticResource BrandRedBrush}"
+                           Text="PROFILE" />
+                <TextBlock FontSize="28"
+                           FontWeight="Black"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           Text="Driver DNA" />
+                <TextBlock x:Name="StatusCaption"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           MaxWidth="640"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Text="Your eight-axis profile across consistency, racecraft, cleanness, endurance, adaptability, improvement, wet weather, and experience." />
+            </StackPanel>
+
+            <!-- Scrollable body. Content host filled from code-behind. -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="Body"
+                            Orientation="Vertical"
+                            Spacing="14"
+                            MaxWidth="1280"
+                            HorizontalAlignment="Left" />
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>

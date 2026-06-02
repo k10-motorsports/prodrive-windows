@@ -39,6 +39,21 @@ namespace RaceCorProDrive.DesignSystem.Components
             set => SetValue(DashboardProperty, value);
         }
 
+        /// <summary>
+        /// Drawing canvas height. Default 280 (matches dashboard 3-up
+        /// viz row). The DNA hero page bumps this to ~480 for a
+        /// larger, more readable radar.
+        /// </summary>
+        public double RadarHeight
+        {
+            get => _canvas.Height;
+            set
+            {
+                _canvas.Height = value;
+                DrawRadar();
+            }
+        }
+
         private readonly Canvas _canvas;
         private readonly TextBlock _archPrimary;
         private readonly TextBlock _archSecondary;
@@ -95,6 +110,9 @@ namespace RaceCorProDrive.DesignSystem.Components
             archStack.Children.Add(_archDescription);
 
             // ── Canvas (children rebuilt on data / size change) ───
+            // Height defaults to 280 — the size the dashboard's 3-up
+            // viz row uses. The DNA page bumps this up for a hero-
+            // sized radar via the RadarHeight setter.
             _canvas = new Canvas { Height = 280 };
             _canvas.SizeChanged += (_, __) => DrawRadar();
 
