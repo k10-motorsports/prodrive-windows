@@ -24,7 +24,11 @@ jobs:
 
       - name: Restore test project
         shell: pwsh
-        run: dotnet restore tests/RaceCorProDrive.Tests/RaceCorProDrive.Tests.csproj
+        # WinUI host (referenced transitively) requires an explicit RID.
+        # Without -p:Platform, MSBuild defaults Platform to AnyCPU and the
+        # csproj derives win-AnyCPU (NETSDK1083). Mirror release.yml, which
+        # always passes Platform + RuntimeIdentifier.
+        run: dotnet restore tests/RaceCorProDrive.Tests/RaceCorProDrive.Tests.csproj -p:Platform=x64 -p:RuntimeIdentifier=win-x64
 
       - name: Run tests with coverage
         shell: pwsh
@@ -34,7 +38,8 @@ jobs:
             --collect:"XPlat Code Coverage" `
             --settings tests/RaceCorProDrive.Tests/coverlet.runsettings `
             --results-directory TestResults `
-            --logger "trx;LogFileName=test-results.trx"
+            --logger "trx;LogFileName=test-results.trx" `
+            -p:Platform=x64 -p:RuntimeIdentifier=win-x64
 
       - name: Locate coverage report
         id: coverage
