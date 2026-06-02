@@ -66,23 +66,13 @@ jobs:
             Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $fence
           }
 
-      - name: Post coverage comment on PR
-        if: github.event_name == 'pull_request' && hashFiles('coverage/cobertura-coverage.xml') != ''
-        uses: irongut/CodeCoverageSummary@v1.3.0
-        with:
-          filename: coverage/cobertura-coverage.xml
-          format: markdown
-          output: both
-          badge: true
-          hide_complexity: true
-          indicators: true
-
-      - name: Add PR comment
-        if: github.event_name == 'pull_request' && hashFiles('code-coverage-results.md') != ''
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          path: code-coverage-results.md
-          header: windows-coverage
+      # NOTE: a PR coverage *comment* used to live here via
+      # irongut/CodeCoverageSummary — removed because it's a Docker
+      # container action ("only supported on Linux") and this job runs on
+      # windows-latest. Coverage is reported in the job summary above
+      # instead. To restore an inline PR comment, generate the markdown in
+      # the pwsh step above and post it with a JS action (e.g.
+      # marocchino/sticky-pull-request-comment), which runs on Windows.
 
       - name: Upload coverage artifact
         if: always()
