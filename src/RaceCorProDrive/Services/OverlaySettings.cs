@@ -307,7 +307,11 @@ namespace RaceCorProDrive.Services
             // page, not the plugin's JSON. If only the host:port lands
             // here, the renderer falls back to the canonical URL it
             // already has in config.js.
-            input.SimHubUrl        ??= "http://localhost:8889/racecor-io-pro-drive/";
+            // null OR "" — an empty save is as unusable as a missing one
+            // (renderer fetches an empty URL, every panel sits at zero), so
+            // heal both. ??= alone would only catch null, leaving "" intact.
+            if (string.IsNullOrEmpty(input.SimHubUrl))
+                input.SimHubUrl = "http://localhost:8889/racecor-io-pro-drive/";
 
             // Host
             input.WinUIAutoLaunchHud  ??= false;
