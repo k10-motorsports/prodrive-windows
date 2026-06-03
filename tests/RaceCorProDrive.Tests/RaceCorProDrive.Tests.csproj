@@ -1,16 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!--
-      Matches the host TFM so we can ProjectReference RaceCorProDrive
-      directly without a multi-targeting layer. Tests run on Windows
-      only — accepted tradeoff vs. extracting Services/Moza + Recording
-      into a portable net8.0 Core library.
+      Windows TFM matches the code under test (it's part of the WinUI
+      host). The test project deliberately does NOT ProjectReference the
+      host — see the <Compile Include> ItemGroup below — so it needs no
+      RuntimeIdentifier and never imports WinUI's PRI/Appx build tooling.
+      (The ExpandPriContent MSBuild task ships only with Visual Studio's
+      msbuild, not the dotnet CLI, so building the host under `dotnet
+      test` fails with MSB4062 — see release.yml, which uses msbuild.)
+      Tests run on Windows only.
     -->
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <WindowsSdkPackageVersion>10.0.19041.57</WindowsSdkPackageVersion>
-    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <Platform Condition="'$(Platform)' == ''">x64</Platform>
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$(Platform)</RuntimeIdentifier>
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -23,9 +24,22 @@
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
+  <!--
+    Compile the specific source files under test directly rather than
+    ProjectReference-ing the WinUI host. Both are self-contained, pure-BCL
+    types (System + System.Text.Json), so the test build stays WinUI-free
+    and avoids the WindowsAppSDK PRI MSBuild tooling that only runs under
+    Visual Studio's msbuild. If a test needs another host type, add its
+    source here — or extract Services into a portable net8.0 library.
+  -->
   <ItemGroup>
-    <ProjectReference Include="..\..\src\RaceCorProDrive\RaceCorProDrive.csproj" />
+    <Compile Include="..\..\src\RaceCorProDrive\Services\OverlaySettings.cs" />
+    <Compile Include="..\..\src\RaceCorProDrive\Services\Moza\MozaPacketBuilder.cs" />
   </ItemGroup>
 </Project>

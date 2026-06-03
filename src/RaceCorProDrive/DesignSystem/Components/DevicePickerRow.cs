@@ -25,6 +25,13 @@ namespace RaceCorProDrive.DesignSystem.Components
         private readonly DeviceClass _deviceClass;
         private readonly Func<string> _getter;
         private readonly Action<string> _setter;
+        // Optional companion setter for the friendly device name. The
+        // Electron overlay can't resolve our WinRT DeviceInformation.Id
+        // against its own Chromium MediaDevices enumeration, so it matches
+        // by label instead. We persist both: the WinRT id stays the
+        // source of truth for native code (RecordingService), the label
+        // is the bridge across the language boundary.
+        private readonly Action<string>? _labelSetter;
         private readonly ComboBox _combo;
         private readonly Button _refreshBtn;
         private bool _suppressSelection;
@@ -44,11 +51,16 @@ namespace RaceCorProDrive.DesignSystem.Components
             public override string ToString() => Disconnected ? $"⚠ {DisplayName}" : DisplayName;
         }
 
-        public DevicePickerRow(DeviceClass deviceClass, Func<string> getter, Action<string> setter)
+        public DevicePickerRow(
+            DeviceClass deviceClass,
+            Func<string> getter,
+            Action<string> setter,
+            Action<string>? labelSetter = null)
         {
             _deviceClass = deviceClass;
             _getter = getter;
             _setter = setter;
+            _labelSetter = labelSetter;
 
             _combo = new ComboBox
             {
@@ -134,6 +146,21 @@ namespace RaceCorProDrive.DesignSystem.Components
                 {
                     _suppressSelection = false;
                 }
+
+                // Backfill the friendly label for legacy saves that have a
+                // WinRT id but no companion label. Without this the overlay
+                // can't resolve the camera until the user re-picks it.
+                if (_labelSetter != null && !string.IsNullOrEmpty(savedId))
+                {
+                    foreach (var i in items)
+                    {
+                        if (i.Id == savedId && !i.Disconnected)
+                        {
+                            _labelSetter(i.DisplayName ?? "");
+                            break;
+                        }
+                    }
+                }
             }
             finally
             {
@@ -150,7 +177,18 @@ namespace RaceCorProDrive.DesignSystem.Components
         private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressSelection) return;
-            if (_combo.SelectedValue is string id) _setter(id);
+            if (_combo.SelectedValue is not string id) return;
+            _setter(id);
+            if (_labelSetter == null) return;
+            // Resolve the label from the currently selected item. Clearing
+            // the selection (id == "") writes an empty label too so the
+            // overlay doesn't keep matching against a stale name.
+            string label = "";
+            if (!string.IsNullOrEmpty(id) && _combo.SelectedItem is Item item && !item.Disconnected)
+            {
+                label = item.DisplayName ?? "";
+            }
+            _labelSetter(label);
         }
     }
 }

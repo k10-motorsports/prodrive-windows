@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  windows-tests:
+    name: xUnit + Coverlet
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore test project
+        shell: pwsh
+        run: dotnet restore tests/RaceCorProDrive.Tests/RaceCorProDrive.Tests.csproj
+
+      - name: Run tests with coverage
+        shell: pwsh
+        run: |
+          dotnet test tests/RaceCorProDrive.Tests/RaceCorProDrive.Tests.csproj `
+            --configuration Release `
+            --collect:"XPlat Code Coverage" `
+            --settings tests/RaceCorProDrive.Tests/coverlet.runsettings `
+            --results-directory TestResults `
+            --logger "trx;LogFileName=test-results.trx"
+
+      - name: Locate coverage report
+        id: coverage
+        shell: pwsh
+        run: |
+          $cobertura = Get-ChildItem -Recurse -Path TestResults -Filter coverage.cobertura.xml | Select-Object -First 1
+          if (-not $cobertura) { throw "coverage.cobertura.xml not found under TestResults" }
+          Write-Host "Found: $($cobertura.FullName)"
+          # Stage at a stable path the rest of the workflow can reference.
+          New-Item -ItemType Directory -Force -Path coverage | Out-Null
+          Copy-Item $cobertura.FullName coverage/cobertura-coverage.xml -Force
+          "path=coverage/cobertura-coverage.xml" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Append coverage summary to job summary
+        if: always()
+        shell: pwsh
+        run: |
+          $xml = "coverage/cobertura-coverage.xml"
+          if (Test-Path $xml) {
+            [xml]$doc = Get-Content $xml
+            $cov = $doc.coverage
+            $lineRate = [math]::Round([double]$cov.'line-rate' * 100, 2)
+            $branchRate = [math]::Round([double]$cov.'branch-rate' * 100, 2)
+            $fence = '```'
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '## Coverage (prodrive-windows)'
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $fence
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "lines    $lineRate%  ($($cov.'lines-covered')/$($cov.'lines-valid'))"
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "branches $branchRate%  ($($cov.'branches-covered')/$($cov.'branches-valid'))"
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $fence
+          }
+
+      # NOTE: a PR coverage *comment* used to live here via
+      # irongut/CodeCoverageSummary — removed because it's a Docker
+      # container action ("only supported on Linux") and this job runs on
+      # windows-latest. Coverage is reported in the job summary above
+      # instead. To restore an inline PR comment, generate the markdown in
+      # the pwsh step above and post it with a JS action (e.g.
+      # marocchino/sticky-pull-request-comment), which runs on Windows.
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-coverage
+          path: |
+            coverage/
+            TestResults/
+          if-no-files-found: warn

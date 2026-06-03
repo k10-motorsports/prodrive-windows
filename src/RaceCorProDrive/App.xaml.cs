@@ -95,6 +95,16 @@ namespace RaceCorProDrive
                 Services.UpdateService.Shared.Start();
                 BootTrace("UpdateService started");
 
+                // Loopback HTTP control surface for the recording pipeline
+                // migration. The overlay delegates to this server when
+                // recordingBackend is "native" (see docs/recording-
+                // migration.md). When the toggle is "electron" (default)
+                // the server is still listening but nothing calls into
+                // it — cheap to leave running so toggling the setting
+                // doesn't require a restart.
+                Recording.RecordingControlServer.Shared.Start();
+                BootTrace($"RecordingControlServer started on port {Recording.RecordingControlServer.Shared.Port}");
+
                 // LAN-exposed diagnostic surface. Opt-in via
                 // racecor.diag.enabled (default ON); writes the bound
                 // port + URLs into the JSONL log on start so a remote

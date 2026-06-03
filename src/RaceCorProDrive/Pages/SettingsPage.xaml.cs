@@ -448,6 +448,14 @@ namespace RaceCorProDrive.Pages
                 "End the recording when you enter the pit lane.",
                 () => _settings.RecordingAutoStopOnPit ?? false,
                 v => _settings.RecordingAutoStopOnPit = v));
+            // Backend toggle — Electron is the default working path; Native
+            // routes capture to this host's FFmpeg pipeline. See
+            // docs/recording-migration.md for the rollout plan.
+            capture.AddRow(MakeRow("Backend", "Electron is the existing path. Native (beta) uses the host's FFmpeg pipeline for better facecam reliability.",
+                MakeSegmented(
+                    new[] { ("electron", "Electron"), ("native", "Native (beta)") },
+                    () => _settings.RecordingBackend ?? "electron",
+                    v => _settings.RecordingBackend = v)));
             AddCard(capture);
 
             var audio = new SettingsCard { Title = "Audio", Caption = "Microphone + system audio sources." };
@@ -458,7 +466,8 @@ namespace RaceCorProDrive.Pages
                 new DevicePickerRow(
                     Windows.Devices.Enumeration.DeviceClass.AudioCapture,
                     () => _settings.RecordingMicDevice ?? "",
-                    v => _settings.RecordingMicDevice = v)));
+                    v => _settings.RecordingMicDevice = v,
+                    v => _settings.RecordingMicLabel = v)));
             audio.AddRow(MakeSlider("Mic volume", null, 0, 100, 1,
                 () => (_settings.RecordingMicVolume ?? 0.8) * 100,
                 v => _settings.RecordingMicVolume = v / 100,
@@ -470,7 +479,8 @@ namespace RaceCorProDrive.Pages
                     // mix system sound into the recording.
                     Windows.Devices.Enumeration.DeviceClass.AudioRender,
                     () => _settings.RecordingSystemAudioDevice ?? "",
-                    v => _settings.RecordingSystemAudioDevice = v)));
+                    v => _settings.RecordingSystemAudioDevice = v,
+                    v => _settings.RecordingSystemAudioLabel = v)));
             audio.AddRow(MakeSlider("System volume", null, 0, 100, 1,
                 () => (_settings.RecordingSystemVolume ?? 1.0) * 100,
                 v => _settings.RecordingSystemVolume = v / 100,
@@ -482,7 +492,8 @@ namespace RaceCorProDrive.Pages
                 new DevicePickerRow(
                     Windows.Devices.Enumeration.DeviceClass.VideoCapture,
                     () => _settings.RecordingWebcamDevice ?? "",
-                    v => { _settings.RecordingWebcamDevice = v; RefreshVideoPreview(); })));
+                    v => { _settings.RecordingWebcamDevice = v; RefreshVideoPreview(); },
+                    v => _settings.RecordingWebcamLabel = v)));
             facecam.AddRow(MakeRow("Size", null,
                 MakeSegmented(
                     new[] { ("small", "Small"), ("medium", "Medium"), ("large", "Large") },
