@@ -68,6 +68,14 @@ namespace RaceCorProDrive.DesignSystem.Components
         /// </summary>
         public event EventHandler? LaunchOverlayRequested;
 
+        /// <summary>
+        /// Raised when the user taps the Screensaver button in the tools group.
+        /// Host opens the full-screen car-photo wall (ScreensaverWindow). Only
+        /// offered when no sim session is running — see
+        /// <see cref="IsScreensaverAvailable"/>.
+        /// </summary>
+        public event EventHandler? ScreensaverRequested;
+
         public static readonly DependencyProperty SelectedKeyProperty = DependencyProperty.Register(
             nameof(SelectedKey), typeof(string), typeof(LeftRail),
             new PropertyMetadata("dashboard", (d, _) => ((LeftRail)d).Refresh()));
@@ -92,9 +100,25 @@ namespace RaceCorProDrive.DesignSystem.Components
             set => SetValue(IsLaunchOverlayAvailableProperty, value);
         }
 
+        /// <summary>
+        /// Whether to offer the Screensaver action. Driven by MainWindow from the
+        /// iRacing detector — hidden while the sim is running so the photo wall can
+        /// never be started during a session. Default true (no sim at startup).
+        /// </summary>
+        public static readonly DependencyProperty IsScreensaverAvailableProperty = DependencyProperty.Register(
+            nameof(IsScreensaverAvailable), typeof(bool), typeof(LeftRail),
+            new PropertyMetadata(true, (d, _) => ((LeftRail)d).RefreshScreensaverVisibility()));
+
+        public bool IsScreensaverAvailable
+        {
+            get => (bool)GetValue(IsScreensaverAvailableProperty);
+            set => SetValue(IsScreensaverAvailableProperty, value);
+        }
+
         private readonly StackPanel _stack;
         private readonly Dictionary<string, RailButton> _buttons = new();
         private readonly RailButton _settingsButton;
+        private readonly RailButton _screensaverButton;
         private readonly RailButton _launchButton;
         private readonly Border _toolsDivider;
 
@@ -144,6 +168,16 @@ namespace RaceCorProDrive.DesignSystem.Components
             };
             _buttons[SettingsKey] = _settingsButton;
             _stack.Children.Add(_settingsButton);
+
+            // Screensaver: opens the full-screen car-photo wall. Quiet (Default)
+            // styling so Launch HUD stays the group's primary red action. Visibility
+            // is gated on the sim state by MainWindow (hidden during a session).
+            _screensaverButton = new RailButton(LucideIconKind.Screensaver, "Screensaver")
+            {
+                IsAlwaysInactive = true,
+            };
+            _screensaverButton.Tapped += (_, __) => ScreensaverRequested?.Invoke(this, EventArgs.Empty);
+            _stack.Children.Add(_screensaverButton);
 
             // Launch HUD: brand-red filled action button. Replaces the
             // floating FAB that used to live at the bottom-left of the
@@ -225,6 +259,7 @@ namespace RaceCorProDrive.DesignSystem.Components
             Content = root;
             Refresh();
             RefreshLaunchVisibility();
+            RefreshScreensaverVisibility();
         }
 
         private static Border MakeHairline()
@@ -297,6 +332,12 @@ namespace RaceCorProDrive.DesignSystem.Components
             // divider since Settings sits flush against the profile
             // section already separated by the upper divider.
             _toolsDivider.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void RefreshScreensaverVisibility()
+        {
+            _screensaverButton.Visibility =
+                IsScreensaverAvailable ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
