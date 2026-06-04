@@ -24,6 +24,12 @@
     <Grid Background="{ThemeResource ApplicationBackgroundThemeBrush}"
           RequestedTheme="Dark">
 
+        <!-- App-level ambient backdrop: a random race-car photo from the
+             car-imagery API, slowly crossfading. First child = behind
+             everything (ContentFrame, rail, title bar float on top via
+             z-order). Self-manages fetch + rotation; see ThemedBackgroundControl. -->
+        <design:ThemedBackgroundControl x:Name="AppBackground" />
+
         <!-- Authed shell: page Frame fills the whole window. Pages
              reserve their left 72pt for the floating rail by adding
              left padding/margin to their content; the rail's acrylic
