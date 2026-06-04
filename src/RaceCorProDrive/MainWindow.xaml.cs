@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using RaceCorProDrive.Pages;
 using RaceCorProDrive.Auth;
 using RaceCorProDrive.DesignSystem.Components;
+using RaceCorProDrive.Screensaver;
 using RaceCorProDrive.Services;
 using Windows.Graphics;
 
@@ -23,6 +24,7 @@ namespace RaceCorProDrive
     {
         private readonly AuthService _authService = new();
         private string _currentPageTag = "dashboard";
+        private ScreensaverWindow? _screensaver;
 
         public MainWindow()
         {
@@ -46,7 +48,10 @@ namespace RaceCorProDrive
             AppRail.DestinationSelected += OnRailDestinationSelected;
             AppRail.SignOutRequested += OnRailSignOutRequested;
             AppRail.LaunchOverlayRequested += OnRailLaunchOverlayRequested;
+            AppRail.ScreensaverRequested += OnRailScreensaverRequested;
             OverlayLauncher.Shared.PropertyChanged += OnOverlayStateChanged;
+            // Keep the Screensaver button hidden whenever the sim is running.
+            IRacingDetector.Shared.PropertyChanged += OnRacingStateChanged;
         }
 
         // Pre-auth: LoginPage. Code-behind calls OnSignInComplete() once
@@ -98,6 +103,7 @@ namespace RaceCorProDrive
             ContentFrame.Visibility = Visibility.Visible;
             AppRail.UserName = CurrentUserDisplayName;
             AppRail.IsLaunchOverlayAvailable = OverlayLauncher.Shared.IsAvailable;
+            AppRail.IsScreensaverAvailable = !IRacingDetector.Shared.IsRunning;
             AppRail.Visibility = Visibility.Visible;
             // ContentFrameLoaded handles the initial page navigation.
         }
@@ -146,6 +152,35 @@ namespace RaceCorProDrive
         private void OnRailLaunchOverlayRequested(object? sender, EventArgs e)
         {
             OverlayLauncher.Shared.Launch();
+        }
+
+        private void OnRailScreensaverRequested(object? sender, EventArgs e)
+        {
+            // Belt-and-suspenders: the rail button is hidden during a session, but
+            // never open the photo wall while the sim is running.
+            if (IRacingDetector.Shared.IsRunning) return;
+
+            if (_screensaver is not null)
+            {
+                _screensaver.Activate();
+                return;
+            }
+
+            var saver = new ScreensaverWindow();
+            saver.Closed += (_, __) => _screensaver = null;
+            _screensaver = saver;
+            saver.Activate();
+        }
+
+        // Hide the Screensaver action whenever the sim is running (and conversely
+        // re-offer it when iRacing exits). The wall itself self-closes on this same
+        // signal — see ScreensaverWindow. Fires on the detector's poll thread, so
+        // marshal the rail update onto the UI thread.
+        private void OnRacingStateChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(IRacingDetector.IsRunning)) return;
+            DispatcherQueue.TryEnqueue(() =>
+                AppRail.IsScreensaverAvailable = !IRacingDetector.Shared.IsRunning);
         }
 
         private void OnOverlayStateChanged(object? sender, PropertyChangedEventArgs e)
