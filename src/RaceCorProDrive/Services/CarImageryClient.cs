@@ -31,16 +31,18 @@ namespace RaceCorProDrive.Services
 
         /// <summary>
         /// Fetch up to <paramref name="count"/> random car photos (distinct cars where
-        /// possible) at the given render width. Spans race + heritage + showcase — the
-        /// whole library — so the screensaver shows variety. Returns an EMPTY list on any
-        /// failure; the screensaver degrades to black rather than throwing.
+        /// possible) at the given render width. With no <paramref name="category"/> this
+        /// spans the whole library (race + heritage + showcase); pass "race" to limit to
+        /// the actual iRacing race cars. Returns an EMPTY list on any failure; callers
+        /// degrade gracefully rather than throwing.
         /// </summary>
         public static async Task<IReadOnlyList<CarShot>> GetRandomAsync(
-            int count, int width, CancellationToken ct = default)
+            int count, int width, string? category = null, CancellationToken ct = default)
         {
             try
             {
                 var url = $"{Api}/random?count={count}&w={width}";
+                if (!string.IsNullOrEmpty(category)) url += $"&category={category}";
                 var resp = await Http.GetFromJsonAsync<RandomResponse>(url, JsonOpts, ct)
                     .ConfigureAwait(false);
 
