@@ -83,3 +83,99 @@ jobs:
             coverage/
             TestResults/
           if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────────
+  # Compile the WinUI 3 host so C#/XAML errors are caught HERE, not at
+  # release time.
+  #
+  # The `windows-tests` job above deliberately compiles the tested
+  # POCOs WITHOUT the host (commit b26535f) to dodge the WindowsAppSDK
+  # MRT `ExpandPriContent` task, which ships only with Visual Studio's
+  # msbuild.exe — not the dotnet CLI. The side effect was that CI never
+  # compiled src/RaceCorProDrive (UseWinUI=true): a plain C# error in
+  # the host (e.g. the CS0029 hotfixed in cebb4e4) sailed through CI
+  # green and only blew up later in the `Build & Release` workflow's
+  # "Publish native host" step, blocking a release.
+  #
+  # This job closes that gap using the SAME known-good recipe
+  # release.yml uses (msbuild.exe via setup-msbuild + the
+  # System.Security.Permissions XAML-compiler shim), but trimmed for
+  # speed: a `Build` (compile) instead of a full self-contained
+  # `Publish`, and x64 only. ARM64 + the real publish stay in
+  # release.yml. If you change the host build recipe in one file,
+  # change it in the other too.
+  host-build:
+    name: Compile WinUI host (x64)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Set up MSBuild (.NET Framework)
+        uses: microsoft/setup-msbuild@v2
+
+      # ─── Workaround: drop System.Security.Permissions 6.0.0 next to
+      # the in-process XAML compiler task so .NET 8 MSBuild can load it.
+      # Verbatim from release.yml with the matrix vars pinned to x64.
+      - name: Restore + patch XAML compiler task deps
+        shell: pwsh
+        run: |
+          dotnet restore src/RaceCorProDrive/RaceCorProDrive.csproj -p:RuntimeIdentifier=win-x64 -p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { throw "restore failed" }
+          $compilerDll = Get-ChildItem -Recurse -Filter "Microsoft.UI.Xaml.Markup.Compiler.dll" -Path "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "tools\\net6\.0" } |
+            Select-Object -First 1
+          if (-not $compilerDll) { throw "Compiler DLL not found in nuget cache" }
+          $toolsDir = $compilerDll.Directory.FullName
+          Write-Host "WindowsAppSDK tools dir: $toolsDir"
+          $sysPerms = Get-ChildItem -Recurse -Filter "System.Security.Permissions.dll" -Path "$env:USERPROFILE\.nuget\packages\system.security.permissions" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "6\.0\.0\\lib\\net6\.0" } |
+            Select-Object -First 1
+          if (-not $sysPerms) {
+            Write-Host "System.Security.Permissions 6.0.0 not in cache; fetching"
+            dotnet nuget push --help | Out-Null  # ensure dotnet is warm
+            $tmpProj = New-TemporaryFile
+            Remove-Item $tmpProj
+            New-Item -ItemType Directory -Path $tmpProj | Out-Null
+            Push-Location $tmpProj
+            "<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><TargetFramework>net6.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=""System.Security.Permissions"" Version=""6.0.0"" /></ItemGroup></Project>" | Set-Content "tmp.csproj"
+            dotnet restore tmp.csproj
+            Pop-Location
+            $sysPerms = Get-ChildItem -Recurse -Filter "System.Security.Permissions.dll" -Path "$env:USERPROFILE\.nuget\packages\system.security.permissions" |
+              Where-Object { $_.FullName -match "6\.0\.0\\lib\\net6\.0" } |
+              Select-Object -First 1
+          }
+          if (-not $sysPerms) { throw "Could not obtain System.Security.Permissions 6.0.0" }
+          Write-Host "Copying $($sysPerms.FullName) -> $toolsDir"
+          Copy-Item -Force $sysPerms.FullName $toolsDir
+
+      # ─── Compile the host (compile-only, x64) ──────────────────────
+      # Mirrors release.yml's "Publish native host" msbuild call, but
+      # with the Build target instead of Publish and the publish-output
+      # props dropped — we only need csc + the XAML compiler to run so
+      # CS-level errors surface. Uses msbuild.exe (NOT `dotnet build`)
+      # so the in-process CompileXaml task runs under .NET Framework.
+      - name: Compile host
+        shell: pwsh
+        run: |
+          msbuild src/RaceCorProDrive/RaceCorProDrive.csproj `
+            /t:Restore`;Build `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:RuntimeIdentifier=win-x64 `
+            /p:UseXamlCompilerExecutable=false `
+            /v:minimal `
+            /bl:host-build.binlog
+          if ($LASTEXITCODE -ne 0) { throw "host compile failed ($LASTEXITCODE)" }
+
+      - name: Upload build binlog on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-build-binlog
+          path: host-build.binlog
+          if-no-files-found: ignore
