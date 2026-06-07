@@ -82,7 +82,7 @@ namespace RaceCorProDrive.DesignSystem
 
             _timer = DispatcherQueue.CreateTimer();
             _timer.Interval = RotateInterval;
-            _timer.Tick += (_, __) => _ = ShowNextAsync();
+            _timer.Tick += (s, e) => _ = ShowNextAsync();
             _timer.Start();
         }
 
