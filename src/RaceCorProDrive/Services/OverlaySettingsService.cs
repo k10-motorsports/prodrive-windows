@@ -94,7 +94,14 @@ namespace RaceCorProDrive.Services
                 _lastSelfWriteUtc = DateTime.UtcNow;
                 var json = JsonSerializer.Serialize(settings, JsonOpts);
                 var tmp = _path + ".tmp";
-                await File.WriteAllTextAsync(tmp, json);
+                // ConfigureAwait(false) is load-bearing: callers may block on this
+                // via GetAwaiter().GetResult() from the UI thread (see
+                // RecordingControlServer.PersistPortToSettings, invoked from
+                // App.OnLaunched). Without it the continuation is posted back to the
+                // UI dispatcher that's already blocked in GetResult() → deadlock, and
+                // the app hangs on a blank window. Resuming off the UI context keeps
+                // the write self-contained on the thread pool.
+                await File.WriteAllTextAsync(tmp, json).ConfigureAwait(false);
                 File.Move(tmp, _path, overwrite: true);
             }
             catch (Exception ex)
