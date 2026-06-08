@@ -10,16 +10,16 @@
     <!--
       Bundle the .NET runtime itself into published output. This is
       SEPARATE from WindowsAppSDKSelfContained above (that bundles only
-      the WinUI native runtime, NOT the .NET runtime). Set here in the
-      project — not solely via the CI/build -p:SelfContained=true flag —
-      so every Release publish path self-contains, with or without the
-      flag. `msbuild /t:Publish /p:SelfContained=true` (which CI uses
-      since we need .NET Framework msbuild for the XAML compiler) does
-      NOT reliably copy the runtime pack the way `dotnet publish
-      --self-contained` does; without this property a release ships
-      framework-dependent and the apphost prompts end users to "install
-      .NET Desktop Runtime" on a clean machine. Debug stays framework-
-      dependent so the F5 inner loop stays fast (dev boxes have the SDK).
+      the WinUI native runtime, not the .NET runtime). Set here in the
+      project, not solely via the CI/build SelfContained MSBuild flag,
+      so every Release publish path self-contains with or without the
+      flag. Publishing through `msbuild /t:Publish` (which CI uses, since
+      the XAML compiler needs .NET Framework msbuild) does not reliably
+      copy the runtime pack the way the dotnet CLI self-contained publish
+      does; without this property a release ships framework-dependent and
+      the apphost prompts users to install the .NET Desktop Runtime on a
+      clean machine (worst on ARM64, where it is rarely pre-installed).
+      Debug stays framework-dependent so the F5 inner loop stays fast.
     -->
     <SelfContained Condition="'$(SelfContained)' == '' And '$(Configuration)' == 'Release'">true</SelfContained>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
