@@ -25,9 +25,11 @@ param(
     [string] $Configuration = 'Release',
     [string] $OverlayRepo   = (Resolve-Path (Join-Path $PSScriptRoot '..\..\prodrive-overlay')),
     [string] $ServerRepo    = (Join-Path $PSScriptRoot '..\..\prodrive-server'),
+    [string] $AcBuilderRepo = (Join-Path $PSScriptRoot '..\..\prodrive-ac-builder'),
     [switch] $SkipHud,
     [switch] $SkipHost,
-    [switch] $SkipExtension
+    [switch] $SkipExtension,
+    [switch] $SkipAcTrack
 )
 
 $ErrorActionPreference = 'Stop'
@@ -124,6 +126,31 @@ if (-not $SkipExtension) {
     }
 }
 
+# ── 3.5 Assetto Corsa track (optional) ──
+# prodrive-ac-builder builds the track locally (Blender); the installable
+# folder is projects/<slug>/build/<slug>/ with the .kn5 emitted alongside
+# it. Assemble the two into one folder (kn5 inside, as AC expects) and
+# hand it to ISCC via /DAC_TRACK_SRC. Skipped if the sibling repo / build
+# output isn't present.
+$acTrackSrc = $null
+if (-not $SkipAcTrack -and (Test-Path $AcBuilderRepo)) {
+    $trackBuild  = Join-Path (Resolve-Path $AcBuilderRepo) 'projects\sand-creek-raceway\build'
+    $trackFolder = Join-Path $trackBuild 'sand_creek_raceway'
+    $trackKn5    = Join-Path $trackBuild 'sand_creek_raceway.kn5'
+    if ((Test-Path $trackFolder) -and (Test-Path $trackKn5)) {
+        Write-Host "→ Staging Assetto Corsa track from $trackFolder…" -ForegroundColor Cyan
+        $acStage = Join-Path $PSScriptRoot 'staging\ACTrack'
+        if (Test-Path $acStage) { Remove-Item -Recurse -Force $acStage }
+        New-Item -ItemType Directory -Path $acStage -Force | Out-Null
+        Copy-Item -Path $trackFolder -Destination $acStage -Recurse
+        # Drop the kn5 inside the folder (the build emits it as a sibling).
+        Copy-Item -Path $trackKn5 -Destination (Join-Path $acStage 'sand_creek_raceway')
+        $acTrackSrc = Join-Path $acStage 'sand_creek_raceway'
+    } else {
+        Write-Host "  (No built track at $trackFolder — skipping AC track. Build it in prodrive-ac-builder first.)" -ForegroundColor Yellow
+    }
+}
+
 # ── 4. Inno Setup ──
 Write-Host "→ Running ISCC…" -ForegroundColor Cyan
 $iscc = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
@@ -143,6 +170,9 @@ if ($extensionCrx -and $extensionId -and $extensionVer) {
     $isccArgs += "/DEXTENSION_CRX=$extensionCrx"
     $isccArgs += "/DEXTENSION_ID=$extensionId"
     $isccArgs += "/DEXTENSION_VERSION=$extensionVer"
+}
+if ($acTrackSrc) {
+    $isccArgs += "/DAC_TRACK_SRC=$acTrackSrc"
 }
 & $iscc @isccArgs | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }

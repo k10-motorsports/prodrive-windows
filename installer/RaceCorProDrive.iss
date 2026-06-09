@@ -137,6 +137,14 @@ Name: "streamdeckplugin"; Description: "Install the RaceCor Stream Deck plugin (
 #if defined(EXTENSION_ID) || defined(EXTENSION_SRC)
 Name: "chromeextension"; Description: "Install the RaceCor Chrome extension (Chrome will prompt on next launch)"; GroupDescription: "Companion installs:"
 #endif
+; Assetto Corsa track: optional install of the bundled Sand Creek
+; Raceway track into the user's AC content\tracks folder. Only offered
+; when AC_TRACK_SRC points at the track payload (CI defines it after
+; downloading the latest prodrive-ac-builder track release). Opt-in —
+; most users won't have Assetto Corsa installed.
+#ifdef AC_TRACK_SRC
+Name: "actrack"; Description: "Install the Sand Creek Raceway track for Assetto Corsa"; GroupDescription: "Companion installs:"; Flags: unchecked
+#endif
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
@@ -184,6 +192,17 @@ Source: "{#EXTENSION_SRC}\*"; DestDir: "{app}\ChromeExtension\unpacked"; Flags: 
 #endif
 #ifdef EXTENSION_CRX
 Source: "{#EXTENSION_CRX}"; DestDir: "{app}\ChromeExtension"; DestName: "racecor-iracing-sync.crx"; Flags: ignoreversion; Tasks: chromeextension
+#endif
+
+; ── Assetto Corsa track (optional) ────────────────────────────
+; Bundled under {app}\ACTrack when AC_TRACK_SRC is defined (CI sets it
+; after downloading the latest prodrive-ac-builder track release). The
+; post-install InstallACTrack() copies it into the user's AC
+; content\tracks folder — auto-detected, or chosen on the browse page
+; when AC can't be found. AC_TRACK_SRC points at the unpacked track
+; folder (contains sand_creek_raceway.kn5 + data/ui/extension/etc).
+#ifdef AC_TRACK_SRC
+Source: "{#AC_TRACK_SRC}\*"; DestDir: "{app}\ACTrack\sand_creek_raceway"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: actrack
 #endif
 
 [Icons]
@@ -257,6 +276,11 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+// Optional Assetto Corsa track companion — the browse page used to ask
+// for the AC tracks folder when it can't be auto-detected.
+var
+  ACTracksDirPage: TInputDirWizardPage;
+
 // ─── Previous-version auto-uninstall ──────────────────────────────────
 // Inno Setup writes uninstall info under the AppId + "_is1" registry key.
 // For per-user installs (PrivilegesRequired=lowest) it's HKCU; legacy
@@ -521,6 +545,188 @@ begin
   CopyTreeRecursive(srcDir, destDir);
 end;
 
+// ─── Assetto Corsa track install (optional companion) ────────────────
+// When AC_TRACK_SRC is defined, [Files] bundles the Sand Creek Raceway
+// track under {app}\ACTrack and the "actrack" task offers to install it
+// into the user's Assetto Corsa content\tracks folder. We auto-detect
+// that folder from Steam; if we can't find it, ACTracksDirPage asks. The
+// code is unconditional and self-guards on the bundled payload existing,
+// matching the SimHub / Stream Deck companion pattern above.
+
+// Steam install dir from the registry. Per-user SteamPath first (written
+// with forward slashes — normalise), then the 32-bit HKLM InstallPath.
+function GetSteamPath(): String;
+var
+  s: String;
+begin
+  Result := '';
+  if RegQueryStringValue(HKCU, 'Software\Valve\Steam', 'SteamPath', s) and (s <> '') then
+  begin
+    StringChangeEx(s, '/', '\', True);
+    Result := s;
+    Exit;
+  end;
+  if RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Valve\Steam', 'InstallPath', s) and (s <> '') then
+    Result := s;
+end;
+
+// <libRoot>\steamapps\common\assettocorsa\content\tracks if it exists.
+function TracksUnderLibrary(libRoot: String): String;
+var
+  t: String;
+begin
+  Result := '';
+  if libRoot = '' then Exit;
+  t := libRoot + '\steamapps\common\assettocorsa\content\tracks';
+  if DirExists(t) then Result := t;
+end;
+
+// Pull the value out of a Steam libraryfolders.vdf  "path"  "X"  line,
+// unescaping the doubled backslashes the .vdf uses.
+function VdfPathValue(line: String): String;
+var
+  rest: String;
+  q: Integer;
+begin
+  Result := '';
+  q := Pos('"path"', line);
+  if q = 0 then Exit;
+  rest := Copy(line, q + Length('"path"'), Length(line));
+  q := Pos('"', rest);
+  if q = 0 then Exit;
+  rest := Copy(rest, q + 1, Length(rest));
+  q := Pos('"', rest);
+  if q = 0 then Exit;
+  Result := Copy(rest, 1, q - 1);
+  StringChangeEx(Result, '\\', '\', True);
+end;
+
+// Auto-detect the AC tracks folder: primary Steam library, then any
+// extra libraries in libraryfolders.vdf, then common fallbacks. '' if
+// not found.
+function DetectACTracks(): String;
+var
+  steam, vdf, t: String;
+  lines: TArrayOfString;
+  i: Integer;
+  candidates: array of String;
+begin
+  Result := '';
+  steam := GetSteamPath();
+  if steam <> '' then
+  begin
+    t := TracksUnderLibrary(steam);
+    if t <> '' then begin Result := t; Exit; end;
+    vdf := steam + '\steamapps\libraryfolders.vdf';
+    if FileExists(vdf) and LoadStringsFromFile(vdf, lines) then
+    begin
+      for i := 0 to GetArrayLength(lines) - 1 do
+      begin
+        if Pos('"path"', lines[i]) > 0 then
+        begin
+          t := TracksUnderLibrary(VdfPathValue(lines[i]));
+          if t <> '' then begin Result := t; Exit; end;
+        end;
+      end;
+    end;
+  end;
+  SetArrayLength(candidates, 3);
+  candidates[0] := ExpandConstant('{pf32}\Steam');
+  candidates[1] := ExpandConstant('{pf}\Steam');
+  candidates[2] := 'C:\Program Files (x86)\Steam';
+  for i := 0 to GetArrayLength(candidates) - 1 do
+  begin
+    t := TracksUnderLibrary(candidates[i]);
+    if t <> '' then begin Result := t; Exit; end;
+  end;
+end;
+
+// Accept whatever the user points the browse page at: the tracks folder
+// itself, the content folder, the assettocorsa root, or a Steam library.
+function NormalizeTracksDir(base: String): String;
+begin
+  Result := '';
+  if base = '' then Exit;
+  if DirExists(base) and (Lowercase(ExtractFileName(base)) = 'tracks') then
+    begin Result := base; Exit; end;
+  if DirExists(base + '\tracks') then
+    begin Result := base + '\tracks'; Exit; end;
+  if DirExists(base + '\content\tracks') then
+    begin Result := base + '\content\tracks'; Exit; end;
+  if TracksUnderLibrary(base) <> '' then
+    begin Result := TracksUnderLibrary(base); Exit; end;
+  if DirExists(base) then Result := base;
+end;
+
+// User-supplied path (browse page) wins; else the auto-detected folder.
+function ResolveACTracksDir(): String;
+begin
+  if (ACTracksDirPage <> nil) and (ACTracksDirPage.Values[0] <> '') then
+    Result := NormalizeTracksDir(ACTracksDirPage.Values[0])
+  else
+    Result := DetectACTracks();
+end;
+
+// Copy the bundled track into the resolved AC tracks folder; if AC can't
+// be located, point the user at the bundled copy instead of failing.
+procedure InstallACTrack();
+var
+  srcDir, tracksDir: String;
+begin
+  srcDir := ExpandConstant('{app}\ACTrack\sand_creek_raceway');
+  if not DirExists(srcDir) then Exit;
+  tracksDir := ResolveACTracksDir();
+  if tracksDir = '' then
+  begin
+    MsgBox('Setup could not find your Assetto Corsa tracks folder.' + #13#10 + #13#10 +
+           'The Sand Creek Raceway track is bundled at:' + #13#10 + srcDir + #13#10 + #13#10 +
+           'Copy the sand_creek_raceway folder into your AC content\tracks folder ' +
+           'to finish installing it.', mbInformation, MB_OK);
+    Exit;
+  end;
+  CopyTreeRecursive(srcDir, tracksDir + '\sand_creek_raceway');
+end;
+
+procedure InitializeWizard();
+begin
+  // Browse page, shown only when the AC track task is selected AND we
+  // couldn't auto-detect the tracks folder (see ShouldSkipPage). Created
+  // unconditionally; harmless when no track is bundled (page never shows).
+  ACTracksDirPage := CreateInputDirPage(wpSelectTasks,
+    'Assetto Corsa Track Location',
+    'Where is your Assetto Corsa "content\tracks" folder?',
+    'Setup could not find Assetto Corsa automatically. Choose your AC ' +
+    'content\tracks folder (or your Assetto Corsa install folder) so the ' +
+    'Sand Creek Raceway track can be installed, then click Next.',
+    False, '');
+  ACTracksDirPage.Add('');
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+var
+  steam: String;
+begin
+  Result := False;
+  if (ACTracksDirPage <> nil) and (PageID = ACTracksDirPage.ID) then
+  begin
+    if not IsTaskSelected('actrack') then
+      Result := True
+    else if DetectACTracks() <> '' then
+      Result := True
+    else
+    begin
+      // Not found automatically — show the page, prefilled with a guess.
+      if ACTracksDirPage.Values[0] = '' then
+      begin
+        steam := GetSteamPath();
+        if steam <> '' then
+          ACTracksDirPage.Values[0] := steam + '\steamapps\common\assettocorsa\content\tracks';
+      end;
+      Result := False;
+    end;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   // Run the previous-version uninstaller right before our files land,
@@ -534,5 +740,9 @@ begin
   begin
     if IsTaskSelected('simhubplugin') then InstallSimHubPlugin();
     if IsTaskSelected('streamdeckplugin') then InstallStreamDeckPlugin();
+    // IsTaskSelected returns False when the task isn't declared (no AC
+    // payload bundled), and InstallACTrack self-guards on the bundle —
+    // so this is safe whether or not AC_TRACK_SRC was defined.
+    if IsTaskSelected('actrack') then InstallACTrack();
   end;
 end;
