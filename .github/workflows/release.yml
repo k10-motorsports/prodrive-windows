@@ -7,16 +7,19 @@ name: Build & Release
 #   - k10-motorsports/prodrive-server   (Chrome extension — optional;
 #                                         skipped if no release exists)
 #   - k10-motorsports/prodrive-ac-builder (Assetto Corsa track zip —
-#                                         optional; skipped if no release)
+#                                         PUBLIC repo; optional, skipped
+#                                         if no release; uses the default
+#                                         GITHUB_TOKEN, not CROSS_REPO_PAT)
 # Builds the WinUI 3 host from source, then runs Inno Setup to bundle
 # the pieces into one .exe and attaches it to a release on this repo.
 #
 # Required repository secrets:
 #   CROSS_REPO_PAT  — PAT (or GitHub App token) with `contents:read` on
-#                     prodrive-plugin, prodrive-overlay, prodrive-server,
-#                     and prodrive-ac-builder. The default GITHUB_TOKEN
-#                     cannot download release assets from sibling private
-#                     repos.
+#                     prodrive-plugin, prodrive-overlay, and
+#                     prodrive-server — all PRIVATE. The default
+#                     GITHUB_TOKEN can't read release assets from sibling
+#                     *private* repos. prodrive-ac-builder is public, so
+#                     its track download just uses GITHUB_TOKEN.
 
 on:
   push:
@@ -227,13 +230,14 @@ jobs:
       # prodrive-ac-builder publishes the installable Assetto Corsa track
       # as a .zip asset on its GitHub release. Bundled as the optional
       # "actrack" installer task that drops it into the user's AC
-      # content\tracks folder. No release (or no CROSS_REPO_PAT access on
-      # the repo) → AC_TRACK_SRC stays unset and the installer ships
-      # without the track.
+      # content\tracks folder. The repo is PUBLIC, so the default
+      # GITHUB_TOKEN downloads it — no cross-repo PAT needed. No release
+      # → AC_TRACK_SRC stays unset and the installer ships without the
+      # track.
       - name: Download latest prodrive-ac-builder track release
         shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/actrack | Out-Null
           try {
