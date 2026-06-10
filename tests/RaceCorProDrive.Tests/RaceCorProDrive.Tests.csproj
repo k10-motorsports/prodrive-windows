@@ -40,6 +40,21 @@
   -->
   <ItemGroup>
     <Compile Include="..\..\src\RaceCorProDrive\Services\OverlaySettings.cs" />
+    <Compile Include="..\..\src\RaceCorProDrive\Services\OverlayLayoutModels.cs" />
+    <Compile Include="..\..\src\RaceCorProDrive\Services\ModuleRegistry.cs" />
     <Compile Include="..\..\src\RaceCorProDrive\Services\Moza\MozaPacketBuilder.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Same LogicalName as the host's embedded copy so
+      ModuleRegistry.LoadEmbedded (which reads GetExecutingAssembly —
+      here, the test assembly) exercises the real fallback path.
+    -->
+    <EmbeddedResource Include="..\..\src\RaceCorProDrive\Resources\layout-registry.json"
+                      LogicalName="RaceCorProDrive.Resources.layout-registry.json" />
+    <Content Include="Fixtures\layout-v2-settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

@@ -38,8 +38,6 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("theme")]           public string? Theme { get; set; }
 
         // ── Component visibility ──
-        [JsonPropertyName("showFuel")]         public bool? ShowFuel { get; set; }
-        [JsonPropertyName("showTyres")]        public bool? ShowTyres { get; set; }
         [JsonPropertyName("showControls")]     public bool? ShowControls { get; set; }
         [JsonPropertyName("showPedals")]       public bool? ShowPedals { get; set; }
         [JsonPropertyName("showPosition")]     public bool? ShowPosition { get; set; }
@@ -53,14 +51,20 @@ namespace RaceCorProDrive.Services
         [JsonPropertyName("showPitBox")]       public bool? ShowPitBox { get; set; }
         [JsonPropertyName("showIncidents")]    public bool? ShowIncidents { get; set; }
         [JsonPropertyName("showSpotter")]      public bool? ShowSpotter { get; set; }
+        // Track maps + race timer were always-visible (no toggle) until
+        // the layout-v2 inventory reconciliation gave every placeable
+        // module a key. Overlay's _MODULE_VISIBILITY carries both.
+        [JsonPropertyName("showMaps")]         public bool? ShowMaps { get; set; }
+        [JsonPropertyName("showTimer")]        public bool? ShowTimer { get; set; }
 
         // ── Layout / display extensions ──
         [JsonPropertyName("bottomYOffset")]   public int? BottomYOffset { get; set; }
-        // Per-group anchor map (PR-B: drag/drop visual editor writes
-        // here). 6 zones: top-left, top-center, top-right, bottom-left,
-        // bottom-center, bottom-right. Keys are group identifiers
-        // (e.g. "tachoBlock", "leaderboardPanel", "spotterPanel").
-        [JsonPropertyName("groupPositions")]  public Dictionary<string, string>? GroupPositions { get; set; }
+        // Layout v2: explicit per-group placement, written by the Visual
+        // tab's preview editor and rendered verbatim by the overlay's v2
+        // engine when layout.version == 2 (older overlays ignore the key
+        // and use layoutPosition). Schema: docs/overlay-layout-v2.md.
+        // (Replaced the never-read "groupPositions" stub.)
+        [JsonPropertyName("layout")]          public OverlayLayout? Layout { get; set; }
 
         // ── Branding (was BrandingSection on web) ──
         [JsonPropertyName("logoSubtitle")]    public string? LogoSubtitle { get; set; }
@@ -153,6 +157,10 @@ namespace RaceCorProDrive.Services
         // SettingsPage. Overlay still reads them harmlessly. Schedule
         // a sweep of overlay code to drop the reads, then remove from
         // the model entirely.
+        [Obsolete("Dead key — fuel/tyres were folded into the pit box panel; the overlay's visibility map never read it. Removed from UI.")]
+        [JsonPropertyName("showFuel")]          public bool? ShowFuel { get; set; }
+        [Obsolete("Dead key — fuel/tyres were folded into the pit box panel; the overlay's visibility map never read it. Removed from UI.")]
+        [JsonPropertyName("showTyres")]         public bool? ShowTyres { get; set; }
         [Obsolete("Race-rule incident counts now come from iRacing telemetry, not user setting. Removed from UI.")]
         [JsonPropertyName("incPenalty")]        public bool? IncPenalty { get; set; }
         [Obsolete("Race-rule incident counts now come from iRacing telemetry, not user setting. Removed from UI.")]
@@ -175,6 +183,15 @@ namespace RaceCorProDrive.Services
         // into the same file rather than maintaining a parallel one.
         [JsonPropertyName("winuiAutoLaunchHud")]  public bool? WinUIAutoLaunchHud { get; set; }
         [JsonPropertyName("winuiLaunchOnLogin")]  public bool? WinUILaunchOnLogin { get; set; }
+
+        // Catch-all so keys this model doesn't (yet) know — overlay-side
+        // defaults like performanceMode/dsShow*, or keys added by a newer
+        // overlay than this host — survive the host's load→save round
+        // trip instead of being silently stripped from the file. The
+        // host serializes the whole object on every save, so without
+        // this the host build is a hard ceiling on the file's schema.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement>? ExtensionData { get; set; }
     }
 
     /// <summary>
@@ -240,8 +257,6 @@ namespace RaceCorProDrive.Services
             input.LogoSubtitle        ??= "";
 
             // Components — most default ON, matching the HUD's defaults.
-            input.ShowFuel            ??= true;
-            input.ShowTyres           ??= true;
             input.ShowControls        ??= true;
             input.ShowPedals          ??= true;
             input.ShowPosition        ??= true;
@@ -255,6 +270,8 @@ namespace RaceCorProDrive.Services
             input.ShowPitBox          ??= true;
             input.ShowIncidents       ??= true;
             input.ShowSpotter         ??= true;
+            input.ShowMaps            ??= true;
+            input.ShowTimer           ??= true;
 
             // Leaderboard
             input.LbFocus             ??= "self";
