@@ -90,6 +90,7 @@ namespace RaceCorProDrive.Pages
         {
             OverlaySettingsService.Shared.Changed -= OnSettingsFileChanged;
             UpdateService.Shared.PropertyChanged -= OnUpdateServicePropertyChanged;
+            TeardownLayoutEditor();
             // Don't clear the titlebar slot here — Frame nav fires the
             // next page's OnLoaded BEFORE this OnUnloaded, so a clear
             // would wipe whatever the new page just set. Each page sets
@@ -125,7 +126,12 @@ namespace RaceCorProDrive.Pages
         {
             LeftColumn.Children.Clear();
             RightColumn.Children.Clear();
+            FullWidthHost.Children.Clear();
             _pendingCards.Clear();
+            // The layout editor owns a capture timer + metrics watcher
+            // subscription; tear down before any rebuild so a tab
+            // switch doesn't leave a timer painting into orphaned DOM.
+            TeardownLayoutEditor();
             // The recording preview only lives on the Recording tab.
             // Clearing here means RefreshVideoPreview() is a no-op when
             // settings change while the user is on another tab (e.g.
@@ -182,28 +188,19 @@ namespace RaceCorProDrive.Pages
 
         private void BuildVisualSection()
         {
-            // Note to PR-B: the contents below are the *current* flat
-            // toggles preserved verbatim so nothing's lost in this PR.
-            // PR-B replaces the layout-position picker with a 6-zone
-            // drag/drop editor; the Display/Effects/Modules/Branding
-            // cards stay alongside it.
+            // The layout editor (live screen preview + draggable group
+            // proxies) is the hero — it owns placement, grouping, and
+            // module visibility, writing the v2 `layout` block plus a
+            // best-effort legacy layoutPosition for older overlays.
+            // The old position picker / bottom-Y-offset / module-toggle
+            // cards it replaces are gone. docs/overlay-layout-v2.md §3.
+            BuildLayoutEditor();
 
             var display = new SettingsCard
             {
                 Title = "Display",
-                Caption = "Where the HUD lives on screen and how it's drawn.",
+                Caption = "How the HUD is drawn.",
             };
-            display.AddRow(MakeRow("Layout position",
-                "Single-anchor mode. Drag/drop editor in the next release.",
-                MakePicker(
-                    // Pruned to options the overlay's _layoutPositionMap
-                    // actually has CSS coverage for. The hyphenated
-                    // top/bottom-center variants would require new
-                    // dashboard.css rules per panel, so they're out of
-                    // this picker until that work lands.
-                    new[] { "top-left", "top-right", "bottom-left", "bottom-right", "centered" },
-                    () => _settings.LayoutPosition ?? "top-right",
-                    v => _settings.LayoutPosition = v)));
             // Zoom is stored as a percentage to match the overlay's
             // wire format (settings.js scales by /100 to produce its
             // CSS zoom). Storing 1.0 here would render the overlay at
@@ -211,13 +208,18 @@ namespace RaceCorProDrive.Pages
             // reports up through 0.18.1.
             display.AddRow(MakeSlider("Zoom", null, 50, 200, 5,
                 () => _settings.Zoom ?? 165.0,
-                v => _settings.Zoom = Math.Round(v),
+                v =>
+                {
+                    _settings.Zoom = Math.Round(v);
+                    // Keep the editor's nominal-size fallbacks in step
+                    // (measured metrics are zoom-baked already).
+                    if (_layoutEditor != null)
+                    {
+                        _layoutEditor.ZoomPercent = _settings.Zoom.Value;
+                        RenderProxies();
+                    }
+                },
                 "0", "%"));
-            display.AddRow(MakeSlider("Bottom Y offset", "Push the HUD up from the bottom edge.",
-                0, 240, 1,
-                () => _settings.BottomYOffset ?? 0,
-                v => _settings.BottomYOffset = (int)Math.Round(v),
-                "0", "px"));
             display.AddRow(MakeRow("Ambient lighting", null,
                 MakeSegmented(
                     new[] { ("off", "Off"), ("auto", "Auto"), ("screen", "Screen"), ("wled", "WLED") },
@@ -256,28 +258,9 @@ namespace RaceCorProDrive.Pages
                 v => _settings.ShowBorders = v));
             AddCard(effects);
 
-            var modules = new SettingsCard
-            {
-                Title = "Modules",
-                Caption = "Toggle individual HUD modules. Off-screen modules don't render.",
-            };
-            void M(string title, Func<bool> g, Action<bool> s)
-                => modules.AddRow(MakeToggleRow(title, null, g, s));
-            // (Fuel/Tyres rows removed — dead keys; both panels folded
-            // into the pit box tabs and the overlay never read them.)
-            M("Track maps",  () => _settings.ShowMaps        ?? true, v => _settings.ShowMaps = v);
-            M("Race timer",  () => _settings.ShowTimer       ?? true, v => _settings.ShowTimer = v);
-            M("Controls",    () => _settings.ShowControls    ?? true, v => _settings.ShowControls = v);
-            M("Pedals",      () => _settings.ShowPedals      ?? true, v => _settings.ShowPedals = v);
-            M("Position",    () => _settings.ShowPosition    ?? true, v => _settings.ShowPosition = v);
-            M("Tachometer",  () => _settings.ShowTacho       ?? true, v => _settings.ShowTacho = v);
-            M("Commentary",  () => _settings.ShowCommentary  ?? true, v => _settings.ShowCommentary = v);
-            M("Leaderboard", () => _settings.ShowLeaderboard ?? true, v => _settings.ShowLeaderboard = v);
-            M("Datastream",  () => _settings.ShowDatastream  ?? true, v => _settings.ShowDatastream = v);
-            M("Pit box",     () => _settings.ShowPitBox      ?? true, v => _settings.ShowPitBox = v);
-            M("Incidents",   () => _settings.ShowIncidents   ?? true, v => _settings.ShowIncidents = v);
-            M("Spotter",     () => _settings.ShowSpotter     ?? true, v => _settings.ShowSpotter = v);
-            AddCard(modules);
+            // Module visibility toggles live in the layout editor's
+            // rail now (eye icons), one list with grouping context —
+            // the old Modules card duplicated that per-key.
 
             var leaderboard = new SettingsCard
             {
@@ -302,14 +285,8 @@ namespace RaceCorProDrive.Pages
             var branding = new SettingsCard
             {
                 Title = "Branding",
-                Caption = "Logos shown in-HUD.",
+                Caption = "Logo toggles moved to the layout editor's module list.",
             };
-            branding.AddRow(MakeToggleRow("K10 logo", null,
-                () => _settings.ShowK10Logo ?? true, v => _settings.ShowK10Logo = v));
-            branding.AddRow(MakeToggleRow("Car logo", null,
-                () => _settings.ShowCarLogo ?? true, v => _settings.ShowCarLogo = v));
-            branding.AddRow(MakeToggleRow("Game logo", null,
-                () => _settings.ShowGameLogo ?? true, v => _settings.ShowGameLogo = v));
             branding.AddRow(MakeRow("Logo subtitle", "Optional small line under the K10 logo.",
                 MakeTextBox(
                     () => _settings.LogoSubtitle ?? "",

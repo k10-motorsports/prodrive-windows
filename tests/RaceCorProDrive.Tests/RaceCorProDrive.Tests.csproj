@@ -42,6 +42,8 @@
     <Compile Include="..\..\src\RaceCorProDrive\Services\OverlaySettings.cs" />
     <Compile Include="..\..\src\RaceCorProDrive\Services\OverlayLayoutModels.cs" />
     <Compile Include="..\..\src\RaceCorProDrive\Services\ModuleRegistry.cs" />
+    <Compile Include="..\..\src\RaceCorProDrive\Services\LayoutEditorModel.cs" />
+    <Compile Include="..\..\src\RaceCorProDrive\Services\OverlayMetricsService.cs" />
     <Compile Include="..\..\src\RaceCorProDrive\Services\Moza\MozaPacketBuilder.cs" />
   </ItemGroup>
 

@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -9,8 +8,6 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.Graphics;
-using Windows.Graphics.Imaging;
-using Windows.Storage.Streams;
 using WinRT.Interop;
 
 namespace RaceCorProDrive.Services
@@ -47,7 +44,7 @@ namespace RaceCorProDrive.Services
             BitmapImage? screenshot = null;
             try
             {
-                screenshot = await CaptureScreenAsync(bounds.Width, bounds.Height);
+                screenshot = await ScreenCapture.CaptureAsync(bounds.Width, bounds.Height);
             }
             catch
             {
@@ -254,122 +251,7 @@ namespace RaceCorProDrive.Services
             return await tcs.Task;
         }
 
-        // ── Win32 GDI screen capture ───────────────────────────────
-        // Uses BitBlt against the desktop DC, then encodes the captured
-        // bytes as PNG into an in-memory stream and decodes them as a
-        // BitmapImage. Goes through BitmapEncoder rather than poking
-        // WriteableBitmap.PixelBuffer because the latter requires an
-        // IBufferByteAccess COM cast that can't be reliably obtained
-        // from a CsWinRT-projected IBuffer — that path silently
-        // produced an empty buffer on the user's machine, leading to
-        // an all-black region picker.
-
-        private static async Task<BitmapImage> CaptureScreenAsync(int width, int height)
-        {
-            var pixelBytes = CaptureScreenBytes(width, height);
-
-            var stream = new InMemoryRandomAccessStream();
-            var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
-            // Bgra8 + Ignore alpha: GDI 32bpp DIBs are BGRX (alpha byte
-            // unused), and PNG's alpha channel doesn't make sense for
-            // an opaque desktop screenshot. Ignore tells the encoder to
-            // treat alpha bytes as padding rather than transparency.
-            encoder.SetPixelData(
-                BitmapPixelFormat.Bgra8,
-                BitmapAlphaMode.Ignore,
-                (uint)width,
-                (uint)height,
-                96.0, 96.0,
-                pixelBytes);
-            await encoder.FlushAsync();
-            stream.Seek(0);
-
-            var bmp = new BitmapImage();
-            await bmp.SetSourceAsync(stream);
-            return bmp;
-        }
-
-        private static byte[] CaptureScreenBytes(int width, int height)
-        {
-            var desktopDc = GetDC(IntPtr.Zero);
-            var memDc = CreateCompatibleDC(desktopDc);
-            var bmp = CreateCompatibleBitmap(desktopDc, width, height);
-            var oldBmp = SelectObject(memDc, bmp);
-
-            try
-            {
-                BitBlt(memDc, 0, 0, width, height, desktopDc, 0, 0, SRCCOPY | CAPTUREBLT);
-
-                var bmi = new BITMAPINFO
-                {
-                    bmiHeader = new BITMAPINFOHEADER
-                    {
-                        biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>(),
-                        biWidth = width,
-                        biHeight = -height, // negative = top-down DIB
-                        biPlanes = 1,
-                        biBitCount = 32,
-                        biCompression = 0, // BI_RGB
-                    },
-                };
-
-                var pixelBytes = new byte[width * height * 4];
-                GetDIBits(memDc, bmp, 0, (uint)height, pixelBytes, ref bmi, 0);
-                return pixelBytes;
-            }
-            finally
-            {
-                SelectObject(memDc, oldBmp);
-                DeleteObject(bmp);
-                DeleteDC(memDc);
-                ReleaseDC(IntPtr.Zero, desktopDc);
-            }
-        }
-
-        // ── P/Invoke ───────────────────────────────────────────────
-
-        private const int SRCCOPY    = 0x00CC0020;
-        private const int CAPTUREBLT = 0x40000000;
-
-        [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
-        [DllImport("user32.dll")] private static extern int    ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
-        [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-        [DllImport("gdi32.dll")] private static extern bool   DeleteDC(IntPtr hdc);
-        [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int w, int h);
-        [DllImport("gdi32.dll")] private static extern bool   DeleteObject(IntPtr hObject);
-        [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
-        [DllImport("gdi32.dll")]
-        private static extern bool BitBlt(
-            IntPtr hdc, int x, int y, int cx, int cy,
-            IntPtr hdcSrc, int x1, int y1, int rop);
-        [DllImport("gdi32.dll")]
-        private static extern int GetDIBits(
-            IntPtr hdc, IntPtr hbmp, uint uStartScan, uint cScanLines,
-            [Out] byte[] lpvBits, ref BITMAPINFO lpbi, uint usage);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct BITMAPINFOHEADER
-        {
-            public uint biSize;
-            public int  biWidth;
-            public int  biHeight;
-            public ushort biPlanes;
-            public ushort biBitCount;
-            public uint biCompression;
-            public uint biSizeImage;
-            public int  biXPelsPerMeter;
-            public int  biYPelsPerMeter;
-            public uint biClrUsed;
-            public uint biClrImportant;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct BITMAPINFO
-        {
-            public BITMAPINFOHEADER bmiHeader;
-            // bmiColors[1] not needed for 32bpp — biCompression=0 + 32bpp
-            // means the pixel format is fixed and the palette is unused.
-        }
+        // Screen capture lives in ScreenCapture.cs now — shared with the
+        // Visual tab's layout editor (which needs periodic scaled shots).
     }
 }

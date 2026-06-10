@@ -95,25 +95,38 @@
                      up roughly balanced in height. -->
                 <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto">
-                    <Grid x:Name="CardsHost"
-                          ColumnSpacing="14"
-                          MaxWidth="1280"
-                          HorizontalAlignment="Left">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel x:Name="LeftColumn"
-                                    Grid.Column="0"
+                    <StackPanel Orientation="Vertical"
+                                Spacing="14"
+                                HorizontalAlignment="Left">
+                        <!-- Full-width slot above the two-column card
+                             grid. The Visual tab's layout editor (live
+                             screen preview + proxy canvas) renders here;
+                             other tabs leave it empty. -->
+                        <StackPanel x:Name="FullWidthHost"
                                     Orientation="Vertical"
                                     Spacing="14"
-                                    VerticalAlignment="Top" />
-                        <StackPanel x:Name="RightColumn"
-                                    Grid.Column="1"
-                                    Orientation="Vertical"
-                                    Spacing="14"
-                                    VerticalAlignment="Top" />
-                    </Grid>
+                                    MaxWidth="1280"
+                                    HorizontalAlignment="Left" />
+                        <Grid x:Name="CardsHost"
+                              ColumnSpacing="14"
+                              MaxWidth="1280"
+                              HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel x:Name="LeftColumn"
+                                        Grid.Column="0"
+                                        Orientation="Vertical"
+                                        Spacing="14"
+                                        VerticalAlignment="Top" />
+                            <StackPanel x:Name="RightColumn"
+                                        Grid.Column="1"
+                                        Orientation="Vertical"
+                                        Spacing="14"
+                                        VerticalAlignment="Top" />
+                        </Grid>
+                    </StackPanel>
                 </ScrollViewer>
             </Grid>
     </Grid>
