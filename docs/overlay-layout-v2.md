@@ -1,6 +1,8 @@
 # Overlay Layout v2 — Preview-Based Module Placement
 
-**Status:** planned · **Owners:** prodrive-windows (host editor) + prodrive-overlay (engine rewrite)
+**Status:** Phase 0 (contract) + Phase 1 (overlay engine + metrics channel) implemented
+2026-06-10 · Phases 2–4 pending. · **Owners:** prodrive-windows (host editor) +
+prodrive-overlay (engine rewrite)
 **Decisions locked 2026-06-10**, refined same day (see [Decision log](#decision-log)).
 
 ## Vision
@@ -293,8 +295,8 @@ editor", line 181).
 
 | Phase | Repo(s) | Work |
 |---|---|---|
-| **0 — Contract** | both | Schema (`layout` block, metrics sidecar), `layout-registry.json` + extraResources packaging + host runtime read + embedded fallback, shared fixture + round-trip tests, inventory reconciliation (dead/missing `show*` keys). |
-| **1 — Overlay engine** | overlay | `layout-v2.js` (containers, reparenting, anchor math, zoom), version gate, metrics IPC + sidecar writer, Playwright coverage. Legacy path untouched. |
+| **0 — Contract** ✅ | both | Schema (`layout` block, metrics sidecar), `layout-registry.json` + extraResources packaging + host runtime read + embedded fallback, shared fixture + round-trip tests, inventory reconciliation (dead/missing `show*` keys). |
+| **1 — Overlay engine** ✅ | overlay | `layout-v2.js` (containers, reparenting, anchor math, zoom), version gate, metrics IPC + sidecar writer, Playwright coverage (`--project=layout-v2`). Legacy path untouched. Implementation notes: comment-node placeholders make restore() exact; `data-structure` keying skips child rebuilds on position-only re-applies; `.lv2-module` CSS (`position/inset/margin/zoom !important`) neutralizes legacy pinning on adopted roots; legacy `applyZoom` self-delegates to `setZoom` while v2 is active; debounced window-resize re-apply. |
 | **2 — Host editor** | windows | Visual tab rebuild: live-capture canvas, proxy layer, full gesture set, right rail, undo, debounced writes, metrics watcher, dual-write legacy keys. |
 | **3 — Migration & cutover** | both | First-run synthesis from legacy keys; delete legacy engine/CSS/keys + `GroupPositions` stub; ship combined installer. |
 | **4 — Polish** | both | Multi-monitor (display picker + `layout.display`), snap/alignment guides, layout presets (save/load), possibly placeable system overlays. |
