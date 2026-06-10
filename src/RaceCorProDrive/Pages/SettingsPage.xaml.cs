@@ -263,8 +263,10 @@ namespace RaceCorProDrive.Pages
             };
             void M(string title, Func<bool> g, Action<bool> s)
                 => modules.AddRow(MakeToggleRow(title, null, g, s));
-            M("Fuel",        () => _settings.ShowFuel        ?? true, v => _settings.ShowFuel = v);
-            M("Tyres",       () => _settings.ShowTyres       ?? true, v => _settings.ShowTyres = v);
+            // (Fuel/Tyres rows removed — dead keys; both panels folded
+            // into the pit box tabs and the overlay never read them.)
+            M("Track maps",  () => _settings.ShowMaps        ?? true, v => _settings.ShowMaps = v);
+            M("Race timer",  () => _settings.ShowTimer       ?? true, v => _settings.ShowTimer = v);
             M("Controls",    () => _settings.ShowControls    ?? true, v => _settings.ShowControls = v);
             M("Pedals",      () => _settings.ShowPedals      ?? true, v => _settings.ShowPedals = v);
             M("Position",    () => _settings.ShowPosition    ?? true, v => _settings.ShowPosition = v);

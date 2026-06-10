@@ -79,5 +79,16 @@
     <Content Include="Assets\LucideIcons\*.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!--
+      Layout v2 module registry — embedded FALLBACK copy of the
+      canonical file the overlay repo owns (and ships at
+      Overlay\resources\layout-registry.json via extraResources).
+      ModuleRegistry.LoadBundled prefers the overlay's copy at runtime;
+      this one covers dev runs without a built overlay. A contract test
+      fails if the two copies drift. LogicalName is explicit because
+      ModuleRegistry reads the stream by that exact name.
+    -->
+    <EmbeddedResource Include="Resources\layout-registry.json"
+                      LogicalName="RaceCorProDrive.Resources.layout-registry.json" />
   </ItemGroup>
 </Project>
