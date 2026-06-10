@@ -6,14 +6,20 @@ name: Build & Release
 #   - k10-motorsports/prodrive-overlay  (Electron HUD, win-x64 unpacked tree)
 #   - k10-motorsports/prodrive-server   (Chrome extension — optional;
 #                                         skipped if no release exists)
+#   - k10-motorsports/prodrive-ac-builder (Assetto Corsa track zip —
+#                                         PUBLIC repo; optional, skipped
+#                                         if no release; uses the default
+#                                         GITHUB_TOKEN, not CROSS_REPO_PAT)
 # Builds the WinUI 3 host from source, then runs Inno Setup to bundle
 # the pieces into one .exe and attaches it to a release on this repo.
 #
 # Required repository secrets:
 #   CROSS_REPO_PAT  — PAT (or GitHub App token) with `contents:read` on
 #                     prodrive-plugin, prodrive-overlay, and
-#                     prodrive-server. The default GITHUB_TOKEN cannot
-#                     download release assets from sibling private repos.
+#                     prodrive-server — all PRIVATE. The default
+#                     GITHUB_TOKEN can't read release assets from sibling
+#                     *private* repos. prodrive-ac-builder is public, so
+#                     its track download just uses GITHUB_TOKEN.
 
 on:
   push:
@@ -220,6 +226,42 @@ jobs:
             Write-Host "::warning::Chrome extension release not available; installer will ship without {app}\ChromeExtension and without the registry install."
           }
 
+      # ─── Download latest AC track release (optional) ───────────────
+      # prodrive-ac-builder publishes the installable Assetto Corsa track
+      # as a .zip asset on its GitHub release. Bundled as the optional
+      # "actrack" installer task that drops it into the user's AC
+      # content\tracks folder. The repo is PUBLIC, so the default
+      # GITHUB_TOKEN downloads it — no cross-repo PAT needed. No release
+      # → AC_TRACK_SRC stays unset and the installer ships without the
+      # track.
+      - name: Download latest prodrive-ac-builder track release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/actrack | Out-Null
+          try {
+            gh release download `
+              --repo k10-motorsports/prodrive-ac-builder `
+              --pattern "*.zip" `
+              --dir artifacts/actrack
+          } catch {
+            Write-Host "::warning::No prodrive-ac-builder track release found; installer ships without the AC track."
+          }
+          $zip = Get-ChildItem artifacts/actrack/*.zip -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($zip) {
+            Expand-Archive -Path $zip.FullName -DestinationPath artifacts/actrack/unpacked -Force
+            # The zip stages a top-level installable track folder
+            # (e.g. sand_creek_raceway/ with the .kn5 + data/ui inside).
+            $trackDir = Get-ChildItem -Path artifacts/actrack/unpacked -Directory | Select-Object -First 1
+            if ($trackDir -and (Get-ChildItem -Path $trackDir.FullName -Recurse -Filter *.kn5 -ErrorAction SilentlyContinue)) {
+              "AC_TRACK_SRC=$($trackDir.FullName)" >> $env:GITHUB_ENV
+              Write-Host "AC track staged at $($trackDir.FullName)"
+            } else {
+              Write-Host "::warning::AC track zip layout unexpected (no .kn5 found); skipping the track."
+            }
+          }
+
       # ─── Workaround: drop System.Security.Permissions 6.0.0 next to
       # the in-process XAML compiler task so .NET 8 MSBuild can load it.
       - name: Restore + patch XAML compiler task deps
@@ -334,6 +376,9 @@ jobs:
           # version drive the registry-install path.
           if ($env:STREAMDECK_PLUGIN) {
             $args += "/DSTREAMDECK_PLUGIN=$env:STREAMDECK_PLUGIN"
+          }
+          if ($env:AC_TRACK_SRC) {
+            $args += "/DAC_TRACK_SRC=$env:AC_TRACK_SRC"
           }
           if ($env:EXTENSION_SRC) {
             $args += "/DEXTENSION_SRC=$env:EXTENSION_SRC"
