@@ -38,7 +38,7 @@
       {
         "id": "secondary", "label": "Race data", "anchor": "bottom-right",
         "x": 1, "y": 1, "locked": true, "flow": "row", "gap": 4,
-        "members": ["leaderboard", "datastream", "pitbox"]
+        "members": ["pitbox", "datastream", "leaderboard"]
       },
       {
         "id": "incidents", "label": "Incidents", "anchor": "bottom-left",

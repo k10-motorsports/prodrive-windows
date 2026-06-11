@@ -52,8 +52,15 @@ namespace RaceCorProDrive.Pages
             _screenH = bounds.Height;
             _canvasScale = CanvasWidth / _screenW;
 
+            // No saved v2 layout yet → synthesize one from the legacy
+            // corner keys so the first preview matches what the user's
+            // overlay renders today (Phase 3 migration). Nothing is
+            // persisted until their first gesture commits a mutation.
+            var seed = _settings.Layout
+                ?? LayoutSynthesis.FromLegacy(_settings, registry, _screenW, _screenH);
+
             _layoutEditor = new LayoutEditorModel(
-                _settings.Layout, registry, _screenW, _screenH, _settings.Zoom ?? 165.0)
+                seed, registry, _screenW, _screenH, _settings.Zoom ?? 165.0)
             {
                 Metrics = OverlayMetricsService.Shared.Load(),
                 IsModuleVisible = m => m.ShowKey == null || GetShowKey(m.ShowKey),
