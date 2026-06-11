@@ -264,12 +264,15 @@ editor", line 181).
 ## 4. Migration & compatibility
 
 - **Gate:** overlay checks `layout.version === 2` → v2 engine; otherwise legacy path.
-  Both paths coexist through Phase 2.
-- **Synthesis:** on first host run with no `layout` block, the host synthesizes groups
-  from existing `layoutPosition` / `bottomYOffset` / `show*` by porting the old
-  `applyLayout` derivation table (main corner → secondary opposite-vertical →
-  incidents opposite-horizontal → commentary diagonal). The user's first preview
-  matches what they already see.
+  Both paths coexist through Phase 3a.
+- **Synthesis (3a, implemented):** when the editor opens with no `layout` block, it
+  seeds from `LayoutSynthesis.FromLegacy` — a port of the old `applyLayout` derivation
+  table (main corner → secondary opposite-vertical/same-horizontal → incidents
+  opposite-horizontal → commentary diagonal → row-reverse member-order flips for left
+  corners / centered → `bottomYOffset` lifts only the game logo, which is all it ever
+  visibly moved). The first preview matches what the user already sees; nothing is
+  written until their first gesture. `synthesis("top-right")` is pinned byte-equal to
+  the registry's `defaultLayout` by test — one seed, two routes.
 - **Cutover (Phase 3):** host and overlay ship together in the combined Inno installer,
   so production never skews — legacy engine + keys are deleted one release after v2
   ships. Inventory cleanup rides along: drop dead `showFuel`/`showTyres` host toggles
@@ -298,7 +301,8 @@ editor", line 181).
 | **0 — Contract** ✅ | both | Schema (`layout` block, metrics sidecar), `layout-registry.json` + extraResources packaging + host runtime read + embedded fallback, shared fixture + round-trip tests, inventory reconciliation (dead/missing `show*` keys). |
 | **1 — Overlay engine** ✅ | overlay | `layout-v2.js` (containers, reparenting, anchor math, zoom), version gate, metrics IPC + sidecar writer, Playwright coverage (`--project=layout-v2`). Legacy path untouched. Implementation notes: comment-node placeholders make restore() exact; `data-structure` keying skips child rebuilds on position-only re-applies; `.lv2-module` CSS (`position/inset/margin/zoom !important`) neutralizes legacy pinning on adopted roots; legacy `applyZoom` self-delegates to `setZoom` while v2 is active; debounced window-resize re-apply. |
 | **2 — Host editor** ✅ | windows | Visual tab rebuild: live-capture canvas, proxy layer, full gesture set, right rail, undo, debounced writes, metrics watcher, dual-write legacy keys. Implementation notes: all gesture/geometry logic in `LayoutEditorModel` (pure BCL, unit-tested — the WinUI partial `SettingsPage.LayoutEditor.cs` is a thin render/pointer shell); capture via shared `ScreenCapture` (extracted from AmbientRegionPicker) at 2×-canvas scaled decode every 1.5 s; metrics via `OverlayMetricsService` watcher; old position-picker/bottom-Y/Modules-card/Branding-toggles removed (rail owns visibility); gap-slider undo entries coalesce per drag. |
-| **3 — Migration & cutover** | both | First-run synthesis from legacy keys; delete legacy engine/CSS/keys + `GroupPositions` stub; ship combined installer. |
+| **3a — Migration** ✅ | windows | Editor seeds from `LayoutSynthesis.FromLegacy` (lazy — persisted on first gesture, not on startup). Canonical-order fix: legacy `sec-right` is row-reverse, so the right-corner secondary flow is `[pitbox, datastream, leaderboard]` (leaderboard at the screen edge) — registry/fixture corrected in both repos. |
+| **3b — Cutover** | both | **Deferred one shipped release** (the legacy path is the rollback hatch until v2 has run on real hardware): proactively write the synthesized block on host startup; delete legacy engine/CSS (`applyLayout`, `layout-*` rules) and keys (`layoutPosition`, `bottomYOffset`); drop the host's dual-write. |
 | **4 — Polish** | both | Multi-monitor (display picker + `layout.display`), snap/alignment guides, layout presets (save/load), possibly placeable system overlays. |
 
 ## Decision log
