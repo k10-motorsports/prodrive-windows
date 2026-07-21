@@ -32,7 +32,14 @@ namespace RaceCorProDrive.Api
     {
         public static CalcClient Shared { get; } = new();
 
-        private const string BaseUrl = "https://api.prodrive.racecor.io";
+        // Calc endpoints are served under the apex host, NOT a dedicated
+        // `api.` subdomain. The zone's TLS cert covers `racecor.io` and
+        // `*.racecor.io` only — a one-label-deep wildcard. `prodrive.racecor.io`
+        // matches it; `api.prodrive.racecor.io` (two labels deep) does not, so
+        // that host fails the TLS handshake and every calc call throws. Keep
+        // this on the apex unless a cert that actually covers the api subdomain
+        // is provisioned (Cloudflare ACM / Total TLS). Same origin ApiClient uses.
+        private const string BaseUrl = "https://prodrive.racecor.io";
 
         private readonly HttpClient _http;
         private string? _bearerToken;
